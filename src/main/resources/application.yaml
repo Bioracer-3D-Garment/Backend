@@ -1,0 +1,19 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: bioracerBackend
+  jpa:
+    hibernate:
+      ddl-auto: create-drop # Flyway manages the schema, not Hibernate
+    properties:
+      hibernate:
+        "[auto_quote_keyword]": true
+        "[format_sql]": true
+    open-in-view: true
+
+server:
+  port: 3000
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
