@@ -1,0 +1,53 @@
+name: build
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    environment:
+      name: "Development"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java version
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "microsoft"
+
+      - name: Delete existing package from GitHub Packages
+        run: |
+          PACKAGE_NAME="be.ucll.se.team18.courses-backend"
+          ORG_NAME="UcllSoftwareEngineering2425"
+
+          echo "Fetching package details..."
+          RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/orgs/$ORG_NAME/packages/maven/$PACKAGE_NAME")
+
+          if echo "$RESPONSE" | jq -e '.message' >/dev/null; then
+            echo "Package not found, skipping deletion."
+          else
+            echo "Deleting package: $PACKAGE_NAME"
+            curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/orgs/$ORG_NAME/packages/maven/$PACKAGE_NAME"
+          fi
+
+      - name: Test with Maven
+        run: mvn test
+
+      - name: Build with Maven
+        run: mvn clean install
+
+      - name: Publish to GitHub Packages
+        run: mvn deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
