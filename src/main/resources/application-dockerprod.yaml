@@ -14,4 +14,8 @@ spring:
         "[default_schema]": bioracer
 
 springdoc:
-  server-url: http://localhost:3000
+  server-url: ${API_URL}
+
+cors:
+  allowed-origins:
+    - ${API_URL}
