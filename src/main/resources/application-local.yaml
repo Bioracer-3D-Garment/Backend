@@ -19,3 +19,4 @@ springdoc:
 cors:
   allowed-origins:
     - ${API_URL}
+    - ${STUDIO_URL}
