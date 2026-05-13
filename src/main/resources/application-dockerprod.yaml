@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: dockerprod
+  datasource:
+    url: jdbc:postgresql://host.docker.internal:5432/bioracer
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        "[default_schema]": bioracer
+
+springdoc:
+  server-url: http://localhost:3000
