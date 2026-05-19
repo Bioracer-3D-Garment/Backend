@@ -8,5 +8,5 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "cors")
 public record CorsProperties(
-                @DefaultValue("http://localhost:3000") List<URL> allowedOrigins) {
+                @DefaultValue("http://localhost:8000") List<URL> allowedOrigins) {
 }
