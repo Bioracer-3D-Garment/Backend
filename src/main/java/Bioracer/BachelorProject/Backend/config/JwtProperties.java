@@ -8,7 +8,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "jwt")
 public record JwtProperties(String secretKey,
                 @DefaultValue Token token) {
-        public record Token(@DefaultValue("Ticket_Backend") String issuer,
+        public record Token(@DefaultValue("Bioracer_Backend") String issuer,
                         @DefaultValue("8h") Duration lifetime) {
         }
 }
