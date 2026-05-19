@@ -7,6 +7,7 @@ import Bioracer.BachelorProject.Backend.exception.UserException;
 import Bioracer.BachelorProject.Backend.model.Role;
 import Bioracer.BachelorProject.Backend.model.User;
 import Bioracer.BachelorProject.Backend.repository.UserRepository;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,10 +18,10 @@ import java.util.List;
 
 @Service
 public class UserService {
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     public UserService(UserRepository userRepository,
             PasswordEncoder passwordEncoder,
@@ -80,7 +81,7 @@ public class UserService {
                 userInput.lastName(),
                 userInput.email(),
                 hashedPassword,
-                userInput.role().equals("user") ? Role.USER : Role.CLIENT);
+                Role.USER);
 
         userRepository.save(user);
 

@@ -20,8 +20,8 @@ public class OpenAPIConfig {
         public OpenAPI customOpenAPI() {
                 return new OpenAPI()
                                 .info(new Info()
-                                                .title("WieZenEvent Ticket API")
-                                                .description("API documentation for managing events and tickets")
+                                                .title("Bioracer Backend API")
+                                                .description("API documentation for managing Bioracer Backend")
                                                 .version("1.0.0"))
                                 .addServersItem(new Server().url(serverUrl))
                                 .components(new Components()

@@ -24,7 +24,7 @@ public class JwtService {
         this.jwtDecoder = jwtDecoder;
     }
 
-    public String generateToken(String username, Role role) {
+    public String generateToken(String username, Long id, Role role) {
         final var now = Instant.now();
         final var expiresAt = now.plus(jwtProperties.token().lifetime());
         final var header = JwsHeader.with(MacAlgorithm.HS256).build();
@@ -34,12 +34,13 @@ public class JwtService {
                 .expiresAt(expiresAt)
                 .subject(username)
                 .claim("scope", role.toGrantedAuthority().getAuthority())
+                .claim("id", id)
                 .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
     public String generateToken(User user) {
-        return generateToken(user.getEmail(), user.getRole());
+        return generateToken(user.getEmail(), user.getId(), user.getRole());
     }
 
     public String extractEmail(String token) {
@@ -50,5 +51,10 @@ public class JwtService {
     public String extractRole(String token) {
         Jwt jwt = jwtDecoder.decode(token);
         return jwt.getClaim("scope");
+    }
+
+    public Long extractId(String token) {
+        Jwt jwt = jwtDecoder.decode(token);
+        return jwt.getClaim("id");
     }
 }
