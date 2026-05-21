@@ -13,7 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-
 @RestController
 @RequestMapping("/projects")
 public class ProjectController {
@@ -67,7 +66,9 @@ public class ProjectController {
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PutMapping("{id}")
-    public Project updateProjectDetails(@PathVariable Long id, @Valid @RequestBody ProjectInput projectInput) {
-        return projectService.updateProjectDetails(id, projectInput);
+    public Project updateProjectDetails(@PathVariable Long id, @RequestBody ProjectInput projectInput,
+            @RequestHeader("Authorization") String authHeader) {
+        Long userId = extractIdFromHeader(authHeader);
+        return projectService.updateProjectDetails(id, projectInput, userId);
     }
 }

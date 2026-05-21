@@ -15,8 +15,8 @@ public class DbInitializer {
         private ProjectRepository projectRepository;
         private PasswordEncoder passwordEncoder;
 
-
-        public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository, PasswordEncoder passwordEncoder) {
+        public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository,
+                        PasswordEncoder passwordEncoder) {
                 this.userRepository = userRepository;
                 this.projectRepository = projectRepository;
                 this.passwordEncoder = passwordEncoder;
@@ -36,7 +36,8 @@ public class DbInitializer {
 
                 userRepository.save(admin);
 
-                Project project = new Project("Test Project", admin, "https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg");
+                Project project = new Project("Test Project", admin,
+                                "https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg");
                 projectRepository.save(project);
 
         }

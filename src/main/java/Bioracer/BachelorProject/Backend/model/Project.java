@@ -1,5 +1,7 @@
 package Bioracer.BachelorProject.Backend.model;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Entity;
@@ -29,14 +31,7 @@ public class Project {
 
     private String coverImage;
 
-    public String getCoverImage() {
-        return coverImage;
-    }
-
-    public void setCoverImage(String coverImage) {
-        this.coverImage = coverImage;
-    }
-
+    private List<String> images;
 
     protected Project() {
     }
@@ -45,6 +40,11 @@ public class Project {
         setName(name);
         setUser(user);
         setCoverImage(coverImage);
+    }
+
+    public Project(String name, User user) {
+        setName(name);
+        setUser(user);
     }
 
     public Long getId() {
@@ -67,6 +67,22 @@ public class Project {
         this.user = user;
     }
 
+    public String getCoverImage() {
+        return coverImage;
+    }
+
+    public void setCoverImage(String coverImage) {
+        this.coverImage = coverImage;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
+    }
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -74,6 +90,8 @@ public class Project {
         result = prime * result + ((id == null) ? 0 : id.hashCode());
         result = prime * result + ((name == null) ? 0 : name.hashCode());
         result = prime * result + ((user == null) ? 0 : user.hashCode());
+        result = prime * result + ((coverImage == null) ? 0 : coverImage.hashCode());
+        result = prime * result + ((images == null) ? 0 : images.hashCode());
         return result;
     }
 
@@ -100,6 +118,16 @@ public class Project {
             if (other.user != null)
                 return false;
         } else if (!user.equals(other.user))
+            return false;
+        if (coverImage == null) {
+            if (other.coverImage != null)
+                return false;
+        } else if (!coverImage.equals(other.coverImage))
+            return false;
+        if (images == null) {
+            if (other.images != null)
+                return false;
+        } else if (!images.equals(other.images))
             return false;
         return true;
     }

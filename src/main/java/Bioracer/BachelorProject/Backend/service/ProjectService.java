@@ -53,21 +53,22 @@ public class ProjectService {
     public Project createProject(ProjectInput projectInput, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException("User does not exist."));
-        return projectRepository.save(new Project(projectInput.name(), user, null));
+        return projectRepository.save(new Project(projectInput.name(), user, projectInput.coverImage()));
     }
 
-    public Project updateProjectDetails(long id, ProjectInput projectInput){
-
-        var existingProject = projectRepository.findById(id).orElseThrow(() -> new RuntimeException("Project with ID: " + id + " not found."));
-
-        if (projectInput.name() != null && projectInput.name() != existingProject.getName()) {
+    public Project updateProjectDetails(long id, ProjectInput projectInput, Long userId) {
+        Project existingProject = projectRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Project with ID: " + id + " not found."));
+        if (existingProject.getUser().getId() != userId) {
+            throw new UserException("Not authorized!");
+        }
+        if (!projectInput.name().equals(existingProject.getName())) {
             existingProject.setName(projectInput.name());
         }
-        if (projectInput.coverImage() != null && projectInput.coverImage() != existingProject.getCoverImage()) {
+        if (!projectInput.coverImage().equals(existingProject.getCoverImage())) {
             existingProject.setCoverImage(projectInput.coverImage());
         }
 
         return projectRepository.save(existingProject);
-
-        } 
+    }
 }
