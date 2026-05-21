@@ -50,10 +50,10 @@ public class ProjectService {
 
     }
 
-    public Project createProject(ProjectInput projectInput, Long userId, String coverImage) {
+    public Project createProject(ProjectInput projectInput, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException("User does not exist."));
-        return projectRepository.save(new Project(projectInput.name(), user, coverImage));
+        return projectRepository.save(new Project(projectInput.name(), user, null));
     }
 
     public Project updateProjectDetails(long id, ProjectInput projectInput){
