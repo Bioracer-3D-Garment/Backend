@@ -71,4 +71,16 @@ public class ProjectService {
 
         return projectRepository.save(existingProject);
     }
+
+    public void deleteProject(Long id, Long userId) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException(
+                        "Project with ID: " + id + " not found."));
+
+        if (!project.getUser().getId().equals(userId)) {
+            throw new UserException("Not authorized!");
+        }
+
+        projectRepository.delete(project);
+    }
 }

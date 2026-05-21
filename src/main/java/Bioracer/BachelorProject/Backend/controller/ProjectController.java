@@ -7,6 +7,7 @@ import Bioracer.BachelorProject.Backend.service.ProjectService;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -70,5 +71,18 @@ public class ProjectController {
             @RequestHeader("Authorization") String authHeader) {
         Long userId = extractIdFromHeader(authHeader);
         return projectService.updateProjectDetails(id, projectInput, userId);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("{id}")
+    public ResponseEntity<Void> deleteProject(
+            @PathVariable Long id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        Long userId = extractIdFromHeader(authHeader);
+
+        projectService.deleteProject(id, userId);
+
+        return ResponseEntity.noContent().build();
     }
 }
