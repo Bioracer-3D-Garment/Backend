@@ -1,0 +1,106 @@
+package Bioracer.BachelorProject.Backend.pipeline.adapters;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
+
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+public class FashnAdapter implements VTONAdapter {
+
+    private static final Logger log = LoggerFactory.getLogger(FashnAdapter.class);
+
+    private static final String DEFAULT_PROMPT =
+            "Fit the garment onto the model exactly as shown in the product image. " +
+            "Preserve all text, logos, graphics, colors, patterns, and fabric details on the garment " +
+            "with pixel-accurate fidelity — do not alter, distort, remove, or reinterpret any design elements. " +
+            "The garment contains the text 'Bioracer' — reproduce it exactly as printed. " +
+            "Do not modify the model's face, skin tone, hair, pose, or body in any way. " +
+            "The garment should appear naturally worn with realistic draping, fit, and lighting " +
+            "consistent with the model image.";
+
+    private static final long POLL_INTERVAL_MS = 3_000;
+
+    private final RestClient client;
+    private final long timeoutSeconds;
+
+    public FashnAdapter(String apiKey, String baseUrl, long timeoutSeconds) {
+        this.client = RestClient.builder()
+                .baseUrl(baseUrl)
+                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .build();
+        this.timeoutSeconds = timeoutSeconds;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public byte[] generate(byte[] garmentImageBytes, byte[] personImageBytes, String category, String prompt) {
+        String modelImage   = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
+        String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(garmentImageBytes);
+        String effectivePrompt = (prompt != null) ? prompt : DEFAULT_PROMPT;
+
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("model_image",      modelImage);
+        inputs.put("product_image",    productImage);
+        inputs.put("prompt",           effectivePrompt);
+        inputs.put("resolution",       "4k");
+        inputs.put("generation_mode",  "quality");
+        inputs.put("num_images",       1);
+        inputs.put("output_format",    "png");
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("model_name", "tryon-max");
+        requestBody.put("inputs", inputs);
+
+        // Step 1: submit prediction
+        Map<String, Object> submitResponse = (Map<String, Object>) client.post()
+                .uri("/run")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .retrieve()
+                .body(Map.class);
+
+        String predictionId = (String) submitResponse.get("id");
+        log.info("Fashn.ai prediction submitted: {}", predictionId);
+
+        // Step 2: poll until completed, failed, or timed out
+        long deadline = System.currentTimeMillis() + timeoutSeconds * 1_000L;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Polling interrupted for prediction: " + predictionId, e);
+            }
+
+            Map<String, Object> statusResponse = (Map<String, Object>) client.get()
+                    .uri("/status/{id}", predictionId)
+                    .retrieve()
+                    .body(Map.class);
+
+            String status = (String) statusResponse.get("status");
+            log.debug("Fashn.ai prediction {} status: {}", predictionId, status);
+
+            if ("completed".equals(status)) {
+                List<String> outputs = (List<String>) statusResponse.get("output");
+                String imageUrl = outputs.get(0);
+                log.info("Fashn.ai prediction {} completed, downloading result from {}", predictionId, imageUrl);
+                return RestClient.create().get()
+                        .uri(imageUrl)
+                        .retrieve()
+                        .body(byte[].class);
+            }
+
+            if ("failed".equals(status) || "cancelled".equals(status)) {
+                throw new RuntimeException("Fashn.ai prediction " + status + " for id: " + predictionId);
+            }
+        }
+
+        throw new RuntimeException(
+                "Fashn.ai prediction timed out after " + timeoutSeconds + "s for id: " + predictionId);
+    }
+}
