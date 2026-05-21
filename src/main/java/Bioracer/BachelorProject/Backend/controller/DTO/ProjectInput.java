@@ -1,7 +1,9 @@
 package Bioracer.BachelorProject.Backend.controller.DTO;
 
+import jakarta.validation.constraints.NotBlank;
+
 public record ProjectInput(
-                String name,
-                String coverImage
-                ) {
+        @NotBlank(message = "Project name is required.") String name,
+
+        String coverImage) {
 }
