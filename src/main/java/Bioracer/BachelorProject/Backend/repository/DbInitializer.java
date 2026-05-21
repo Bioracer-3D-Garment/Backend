@@ -7,6 +7,9 @@ import Bioracer.BachelorProject.Backend.model.Role;
 import Bioracer.BachelorProject.Backend.model.User;
 import jakarta.annotation.PostConstruct;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Component
@@ -37,7 +40,8 @@ public class DbInitializer {
                 userRepository.save(admin);
 
                 Project project = new Project("Test Project", admin,
-                                "https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg");
+                                "fashn-export-1778657803428_ebqsrs",
+                                new ArrayList<>(List.of("fashn-export-1778657803428_ebqsrs", "rood_weenmr")));
                 projectRepository.save(project);
         }
 }

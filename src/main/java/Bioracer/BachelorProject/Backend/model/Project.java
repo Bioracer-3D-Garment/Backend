@@ -42,6 +42,13 @@ public class Project {
         setCoverImage(coverImage);
     }
 
+    public Project(String name, User user, String coverImage, List<String> images) {
+        setName(name);
+        setUser(user);
+        setCoverImage(coverImage);
+        setImages(images);
+    }
+
     public Project(String name, User user) {
         setName(name);
         setUser(user);

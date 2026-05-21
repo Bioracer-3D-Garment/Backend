@@ -56,7 +56,7 @@ public class UserService {
                     user.getEmail(),
                     user.getFirstName(),
                     user.getLastName(),
-                    user.getRole(), user.getId());
+                    user.getRole());
         } catch (BadCredentialsException e) {
             throw new NotFoundException("Invalid email or password!");
         }
@@ -99,8 +99,7 @@ public class UserService {
                 authUser.getEmail(),
                 authUser.getFirstName(),
                 authUser.getLastName(),
-                authUser.getRole(),
-                authUser.getId());
+                authUser.getRole());
     }
 
 }
