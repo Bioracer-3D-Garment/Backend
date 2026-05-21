@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:54321/bioracer?currentSchema=bioracer
+    url: jdbc:postgresql://localhost:5432/bioracer?currentSchema=bioracer
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -27,3 +27,15 @@ cors:
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
+
+pipeline:
+  poses-dir: /home/eliasxmas/UCLL/Jaar 3/Semester 2/Bachelor Project/Bioracer 3D Garment/Backend/src/main/resources/poses
+  output-dir: /home/eliasxmas/bioracer/output
+
+vton:
+  adapter: fashn
+
+fashn:
+  api.key: ${FASHN_API_KEY:}
+  base-url: https://api.fashn.ai/v1
+  timeout-seconds: 120
