@@ -27,13 +27,24 @@ public class Project {
     @NotNull(message = "User is required.")
     private User user;
 
+    private String coverImage;
+
+    public String getCoverImage() {
+        return coverImage;
+    }
+
+    public void setCoverImage(String coverImage) {
+        this.coverImage = coverImage;
+    }
+
+
     protected Project() {
     }
 
-    public Project(String name, User user) {
+    public Project(String name, User user, String coverImage) {
         setName(name);
         setUser(user);
-
+        setCoverImage(coverImage);
     }
 
     public Long getId() {
