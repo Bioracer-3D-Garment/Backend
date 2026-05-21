@@ -5,4 +5,4 @@ spring:
     name: bioracerBackend
 
 server:
-  port: 3000
+  port: ${SERVER_PORT}

@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/bioracer?currentSchema=bioracer
+    url: jdbc:postgresql://localhost:${DATABASE_PORT}/bioracer?currentSchema=bioracer
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
