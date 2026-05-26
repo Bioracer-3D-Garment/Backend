@@ -7,11 +7,16 @@ import Bioracer.BachelorProject.Backend.model.Role;
 import Bioracer.BachelorProject.Backend.model.User;
 import jakarta.annotation.PostConstruct;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 import java.util.ArrayList;
 
 @Component
+@Profile("local")
 public class DbInitializer {
 	private final UserRepository userRepository;
 	private final ProjectRepository projectRepository;

@@ -68,6 +68,18 @@ public class Project {
         setGallery(gallery);
     }
 
+    public Project(String name, User user, String coverImage, List<String> images) {
+        setName(name);
+        setUser(user);
+        setCoverImage(coverImage);
+        setImages(images);
+    }
+
+    public Project(String name, User user) {
+        setName(name);
+        setUser(user);
+    }
+
     public Long getId() {
         return id;
     }
@@ -86,6 +98,22 @@ public class Project {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public String getCoverImage() {
+        return coverImage;
+    }
+
+    public void setCoverImage(String coverImage) {
+        this.coverImage = coverImage;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
     }
 
     @Override
