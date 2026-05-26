@@ -32,6 +32,11 @@ pipeline:
   poses-dir: /home/eliasxmas/UCLL/Jaar 3/Semester 2/Bachelor Project/Bioracer 3D Garment/Backend/src/main/resources/poses
   output-dir: cloudinary
 
+server:
+  error:
+    include-message: always
+    include-stacktrace: always
+
 vton:
   adapter: fashn
 

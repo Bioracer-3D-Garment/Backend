@@ -132,13 +132,42 @@ public class BatchController {
         return ResponseEntity.ok(body);
     }
 
+    @GetMapping("/{jobId}/images/{filename}")
+    public ResponseEntity<byte[]> getImage(@PathVariable String jobId, @PathVariable String filename) throws IOException {
+        BatchJob job = requireJob(jobId);
+        Path outputPath = Paths.get(job.getOutputPath());
+
+        if (!Files.isDirectory(outputPath)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Output directory not found for job: " + jobId);
+        }
+
+        // find a file matching the name (with any image extension)
+        Path imageFile;
+        try (Stream<Path> stream = Files.list(outputPath)) {
+            imageFile = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String name = p.getFileName().toString();
+                        int dot = name.lastIndexOf('.');
+                        String base = (dot > 0) ? name.substring(0, dot) : name;
+                        return base.equals(filename) && BatchService.isImageFile(name);
+                    })
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Image not found: " + filename + " in job " + jobId));
+        }
+
+        byte[] bytes = Files.readAllBytes(imageFile);
+        MediaType contentType = detectMediaType(imageFile.getFileName().toString());
+        return ResponseEntity.ok().contentType(contentType).body(bytes);
+    }
+
     @GetMapping("/{jobId}/download")
-    public ResponseEntity<?> downloadJob(@PathVariable String jobId) {
+    public ResponseEntity<StreamingResponseBody> downloadJob(@PathVariable String jobId) {
         BatchJob job = requireJob(jobId);
 
         if (job.getStatus() != BatchStatus.DONE) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Job not finished"));
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job not finished: " + jobId);
         }
 
         Path outputPath = Paths.get(job.getOutputPath());
@@ -261,5 +290,13 @@ public class BatchController {
         return jobRepository.findById(jobId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Batch job not found: " + jobId));
+    }
+
+    private static MediaType detectMediaType(String filename) {
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".png"))  return MediaType.IMAGE_PNG;
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+        if (lower.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 }

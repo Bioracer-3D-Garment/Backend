@@ -6,11 +6,14 @@ import Bioracer.BachelorProject.Backend.pipeline.models.BatchJobRepository;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
 import Bioracer.BachelorProject.Backend.pipeline.models.FailedItem;
 import Bioracer.BachelorProject.Backend.pipeline.utils.CatalogProduct;
+import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
+import Bioracer.BachelorProject.Backend.service.CloudinaryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,6 +22,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // Java 21 virtual threads required: Executors.newVirtualThreadPerTaskExecutor() is used for
@@ -43,6 +48,8 @@ public class BatchService {
 
     private final VTONAdapter adapter;
     private final BatchJobRepository jobRepository;
+    private final ProjectRepository projectRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Value("${pipeline.poses-dir}")
     private String posesDir;
@@ -50,9 +57,12 @@ public class BatchService {
     @Value("${pipeline.output-dir}")
     private String outputDir;
 
-    public BatchService(VTONAdapter adapter, BatchJobRepository jobRepository) {
+    public BatchService(VTONAdapter adapter, BatchJobRepository jobRepository,
+                        ProjectRepository projectRepository, CloudinaryService cloudinaryService) {
         this.adapter = adapter;
         this.jobRepository = jobRepository;
+        this.projectRepository = projectRepository;
+        this.cloudinaryService = cloudinaryService;
     }
 
     public BatchJob createJob(int totalCount, Long folderId) {
@@ -108,6 +118,10 @@ public class BatchService {
             log.info("Batch job {} finished — status={} failed={}",
                     jobId, job.getStatus(), failedItems.size());
 
+            if (job.getStatus() == BatchStatus.DONE && job.getFolderId() != null) {
+                writeGalleryToProject(job);
+            }
+
         } catch (Exception e) {
             log.error("Batch job {} encountered a fatal error", jobId, e);
             fail(job, e.getMessage());
@@ -115,6 +129,48 @@ public class BatchService {
     }
 
     // ---- private helpers ----
+
+    @Transactional
+    void writeGalleryToProject(BatchJob job) {
+        Path jobOutputDir = Paths.get(job.getOutputPath());
+        List<Path> imageFiles;
+        try (Stream<Path> stream = Files.list(jobOutputDir)) {
+            imageFiles = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> isImageFile(p.getFileName().toString()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            log.error("Failed to list output files for job {} while writing project gallery", job.getJobId(), e);
+            return;
+        }
+
+        String cloudinaryFolder = "bioracer/generated/" + job.getJobId();
+        List<String> galleryUrls = new ArrayList<>();
+        for (Path imageFile : imageFiles) {
+            String publicId = stripExtension(imageFile.getFileName().toString());
+            try {
+                byte[] bytes = Files.readAllBytes(imageFile);
+                String secureUrl = cloudinaryService.upload(bytes, cloudinaryFolder, publicId);
+                galleryUrls.add(secureUrl);
+                log.info("Uploaded {} to Cloudinary: {}", publicId, secureUrl);
+            } catch (Exception e) {
+                log.error("Failed to upload {} to Cloudinary, skipping", publicId, e);
+            }
+        }
+
+        if (galleryUrls.isEmpty()) {
+            log.warn("No images successfully uploaded to Cloudinary for job {}", job.getJobId());
+            return;
+        }
+
+        projectRepository.findById(job.getFolderId()).ifPresent(project -> {
+            project.setGallery(galleryUrls);
+            projectRepository.save(project);
+            log.info("Updated gallery for project {} with {} Cloudinary images from job {}",
+                    job.getFolderId(), galleryUrls.size(), job.getJobId());
+        });
+    }
 
     private List<FailedItem> processAllCombinations(BatchJob job,
                                                      List<CatalogProduct> products,
