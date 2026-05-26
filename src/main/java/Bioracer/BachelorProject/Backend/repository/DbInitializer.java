@@ -8,37 +8,44 @@ import Bioracer.BachelorProject.Backend.model.User;
 import jakarta.annotation.PostConstruct;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.List;
+import java.util.ArrayList;
 
 @Component
 public class DbInitializer {
-        private UserRepository userRepository;
-        private ProjectRepository projectRepository;
-        private PasswordEncoder passwordEncoder;
+	private final UserRepository userRepository;
+	private final ProjectRepository projectRepository;
+	private final PasswordEncoder passwordEncoder;
 
 
-        public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository, PasswordEncoder passwordEncoder) {
-                this.userRepository = userRepository;
-                this.projectRepository = projectRepository;
-                this.passwordEncoder = passwordEncoder;
-        }
+	public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository, PasswordEncoder passwordEncoder) {
+		this.userRepository = userRepository;
+		this.projectRepository = projectRepository;
+		this.passwordEncoder = passwordEncoder;
+	}
 
-        public void ClearAll() {
-                userRepository.deleteAll();
-                projectRepository.deleteAll();
-        }
+	public void ClearAll() {
+		userRepository.deleteAll();
+		projectRepository.deleteAll();
+	}
 
-        @PostConstruct
-        public void initialize() {
-                ClearAll();
+	@PostConstruct
+	public void initialize() {
+		ClearAll();
 
-                User admin = new User("admin", "admin", "admin@bioracer.be", passwordEncoder.encode("admin123"),
-                                Role.ADMIN);
+		User admin = new User("admin", "admin", "admin@bioracer.be", passwordEncoder.encode("admin123"),
+				Role.ADMIN);
 
-                userRepository.save(admin);
+		userRepository.save(admin);
 
-                Project project = new Project("Test Project", admin, "https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg");
-                projectRepository.save(project);
+		Project project = new Project("Test Project", admin, 
+				"https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg",
+				new ArrayList<>(List.of(
+					"https://res.cloudinary.com/dfuh1mdzq/image/upload/v1234567890/sample1.jpg",
+					"https://res.cloudinary.com/dfuh1mdzq/image/upload/v1234567890/sample2.jpg"
+				)));
+		projectRepository.save(project);
 
-        }
+	}
 
 }

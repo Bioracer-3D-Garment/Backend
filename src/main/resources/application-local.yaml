@@ -30,7 +30,7 @@ jwt:
 
 pipeline:
   poses-dir: /home/eliasxmas/UCLL/Jaar 3/Semester 2/Bachelor Project/Bioracer 3D Garment/Backend/src/main/resources/poses
-  output-dir: /home/eliasxmas/bioracer/output
+  output-dir: cloudinary
 
 vton:
   adapter: fashn
@@ -39,3 +39,8 @@ fashn:
   api.key: ${FASHN_API_KEY:}
   base-url: https://api.fashn.ai/v1
   timeout-seconds: 120
+
+cloudinary:
+  cloud-name: ${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}

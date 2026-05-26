@@ -1,7 +1,5 @@
 package Bioracer.BachelorProject.Backend.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -9,8 +7,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "project")
@@ -29,6 +31,10 @@ public class Project {
 
     private String coverImage;
 
+    @ElementCollection
+    @CollectionTable(name = "project_gallery", joinColumns = @JoinColumn(name = "project_id"))
+    private List<String> gallery = new ArrayList<>();
+
     public String getCoverImage() {
         return coverImage;
     }
@@ -37,6 +43,13 @@ public class Project {
         this.coverImage = coverImage;
     }
 
+    public List<String> getGallery() {
+        return gallery;
+    }
+
+    public void setGallery(List<String> gallery) {
+        this.gallery = gallery != null ? gallery : new ArrayList<>();
+    }
 
     protected Project() {
     }
@@ -45,6 +58,14 @@ public class Project {
         setName(name);
         setUser(user);
         setCoverImage(coverImage);
+        this.gallery = new ArrayList<>();
+    }
+
+    public Project(String name, User user, String coverImage, List<String> gallery) {
+        setName(name);
+        setUser(user);
+        setCoverImage(coverImage);
+        setGallery(gallery);
     }
 
     public Long getId() {
@@ -74,6 +95,8 @@ public class Project {
         result = prime * result + ((id == null) ? 0 : id.hashCode());
         result = prime * result + ((name == null) ? 0 : name.hashCode());
         result = prime * result + ((user == null) ? 0 : user.hashCode());
+        result = prime * result + ((coverImage == null) ? 0 : coverImage.hashCode());
+        result = prime * result + ((gallery == null) ? 0 : gallery.hashCode());
         return result;
     }
 
@@ -100,6 +123,16 @@ public class Project {
             if (other.user != null)
                 return false;
         } else if (!user.equals(other.user))
+            return false;
+        if (coverImage == null) {
+            if (other.coverImage != null)
+                return false;
+        } else if (!coverImage.equals(other.coverImage))
+            return false;
+        if (gallery == null) {
+            if (other.gallery != null)
+                return false;
+        } else if (!gallery.equals(other.gallery))
             return false;
         return true;
     }
