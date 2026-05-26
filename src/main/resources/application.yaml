@@ -3,6 +3,10 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:local}
   application:
     name: bioracerBackend
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 210MB
 
 server:
   port: 8000

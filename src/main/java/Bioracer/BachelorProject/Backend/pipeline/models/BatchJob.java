@@ -28,6 +28,8 @@ public class BatchJob {
 
     private int completedCount;
 
+    private int uploadedCount;
+
     private LocalDateTime createdAt;
 
     private Long folderId;
@@ -67,6 +69,9 @@ public class BatchJob {
 
     public int getCompletedCount() { return completedCount; }
     public void setCompletedCount(int completedCount) { this.completedCount = completedCount; }
+
+    public int getUploadedCount() { return uploadedCount; }
+    public void setUploadedCount(int uploadedCount) { this.uploadedCount = uploadedCount; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
 

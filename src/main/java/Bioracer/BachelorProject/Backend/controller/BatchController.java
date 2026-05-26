@@ -1,31 +1,44 @@
 package Bioracer.BachelorProject.Backend.controller;
 
+import Bioracer.BachelorProject.Backend.controller.DTO.BatchStatusResponse;
+import Bioracer.BachelorProject.Backend.controller.DTO.BatchSubmitResponse;
+import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
+import Bioracer.BachelorProject.Backend.controller.DTO.GeneratedAssetResponse;
+import Bioracer.BachelorProject.Backend.controller.DTO.ZipValidationErrorResponse;
+import Bioracer.BachelorProject.Backend.exception.ZipValidationException;
+import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchJobRepository;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
 import Bioracer.BachelorProject.Backend.pipeline.services.BatchService;
-import Bioracer.BachelorProject.Backend.pipeline.utils.CatalogProduct;
+import Bioracer.BachelorProject.Backend.pipeline.utils.GarmentZipEntry;
+import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -38,223 +51,259 @@ public class BatchController {
 
     private final BatchService batchService;
     private final BatchJobRepository jobRepository;
+    private final GeneratedAssetRepository generatedAssetRepository;
 
-    public BatchController(BatchService batchService, BatchJobRepository jobRepository) {
+    public BatchController(BatchService batchService,
+                           BatchJobRepository jobRepository,
+                           GeneratedAssetRepository generatedAssetRepository) {
         this.batchService = batchService;
         this.jobRepository = jobRepository;
+        this.generatedAssetRepository = generatedAssetRepository;
     }
 
     /**
      * POST /batches
      *
-     * Accepts multipart/form-data. Garments via one of two mutually exclusive options:
-     *   Option A — individual files:
-     *     garmentFiles      (repeated MultipartFile)
-     *     garmentNames      (repeated String, same order as garmentFiles)
-     *     garmentCategories (repeated String: "top" | "bottom", same order)
-     *   Option B — ZIP archive:
-     *     catalog           (single MultipartFile, ZIP with tops/ and bottoms/ folders)
+     * Accepts multipart/form-data with a single ZIP archive:
+     *   garmentZip  — ZIP with GarmentName/{front,back,side}.jpg + category.txt per subfolder
+     *   gender      — "male" | "female"
+     *   folderId    — project ID (required)
      *
-     * Common fields:
-     *   gender    ("male" | "female") — all pose images in {poses-dir}/{gender}/ are used
-     *   folderId  (Long)
+     * Every garment subfolder must contain front.jpg, back.jpg, side.jpg, and category.txt
+     * (containing "upper_body" or "lower_body"). Missing files → 400 with garmentErrors detail.
      */
+    @ApiResponses({
+        @ApiResponse(responseCode = "202", description = "Batch job accepted",
+            content = @Content(schema = @Schema(implementation = BatchSubmitResponse.class))),
+        @ApiResponse(responseCode = "400", description = "ZIP validation failed or missing parameters",
+            content = @Content(schema = @Schema(implementation = ZipValidationErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Project not owned by caller",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Map<String, String>> submitBatch(
-            @RequestPart(value = "garmentFiles",      required = false) List<MultipartFile> garmentFiles,
-            @RequestParam(value = "garmentNames",     required = false) List<String> garmentNames,
-            @RequestParam(value = "garmentCategories",required = false) List<String> garmentCategories,
-            @RequestPart(value = "catalog",           required = false) MultipartFile catalog,
-            @RequestParam("gender")                   String gender,
-            @RequestParam(value = "folderId",         required = false) Long folderId) throws IOException {
+    public ResponseEntity<BatchSubmitResponse> submitBatch(
+            @RequestPart("garmentZip")  MultipartFile garmentZip,
+            @RequestParam("gender")     String gender,
+            @RequestParam("folderId")   Long folderId) throws IOException {
 
-        // --- parse garments ---
-        List<CatalogProduct> products;
-        boolean hasFiles   = garmentFiles != null && !garmentFiles.isEmpty();
-        boolean hasCatalog = catalog != null && !catalog.isEmpty();
+        List<GarmentZipEntry> garments = parseGarmentZip(garmentZip);
 
-        if (hasFiles && hasCatalog) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Provide either garmentFiles or catalog — not both");
-        }
-        if (!hasFiles && !hasCatalog) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Provide either garmentFiles or catalog");
-        }
-
-        if (hasFiles) {
-            products = parseIndividualGarments(garmentFiles, garmentNames, garmentCategories);
-        } else {
-            products = parseZipCatalog(catalog);
-        }
-
-        if (products.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No valid garments found");
-        }
-
-        // --- validate gender and resolve pose files per distinct garment category ---
         String normalizedGender = gender.trim().toLowerCase();
-        products.stream().map(CatalogProduct::category).distinct().forEach(category -> {
-            List<java.nio.file.Path> poses = batchService.resolvePoseFiles(normalizedGender, category);
-            if (poses.isEmpty()) {
-                String folder = BatchService.categoryToFolder(category);
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "No pose images found for gender='" + normalizedGender +
-                        "' category='" + folder + "'. Expected images in {poses-dir}/" +
-                        normalizedGender + "/" + folder + "/");
+
+        // Validate server-side pose directories before creating the job
+        for (String angle : List.of("front", "back", "side")) {
+            try {
+                batchService.resolvePoseFileForAngle(normalizedGender, angle);
+            } catch (IllegalStateException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
             }
-        });
+        }
 
-        // Total = sum of pose count per product (tops and bottoms may have different counts)
-        int total = products.stream()
-                .mapToInt(p -> batchService.resolvePoseFiles(normalizedGender, p.category()).size())
-                .sum();
-
+        int total = garments.size() * 3;
         BatchJob job = batchService.createJob(total, folderId);
-        batchService.runBatch(job.getJobId(), products, normalizedGender);
+        batchService.runBatch(job.getJobId(), garments, normalizedGender);
 
-        log.info("Submitted batch job {} — {} products, {} combinations, gender={}",
-                job.getJobId(), products.size(), total, normalizedGender);
-        return ResponseEntity.accepted().body(Map.of("jobId", job.getJobId()));
+        log.info("Submitted batch job {} — {} garments, {} combinations, gender={}",
+                job.getJobId(), garments.size(), total, normalizedGender);
+        return ResponseEntity.accepted().body(new BatchSubmitResponse(job.getJobId()));
     }
 
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Job status",
+            content = @Content(schema = @Schema(implementation = BatchStatusResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Job not found",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/status")
-    public ResponseEntity<Map<String, Object>> getStatus(@PathVariable String jobId) {
+    public ResponseEntity<BatchStatusResponse> getStatus(@PathVariable String jobId) {
         BatchJob job = requireJob(jobId);
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("jobId",       job.getJobId());
-        body.put("status",      job.getStatus().name());
-        body.put("completed",   job.getCompletedCount());
-        body.put("total",       job.getTotalCount());
-        body.put("failedItems", job.getFailedItems());
+        List<GeneratedAssetResponse> assets = null;
+        BatchStatus status = job.getStatus();
+        if (status == BatchStatus.DONE || status == BatchStatus.PARTIAL) {
+            assets = generatedAssetRepository.findByJobId(jobId).stream()
+                    .map(GeneratedAssetResponse::from)
+                    .toList();
+        }
 
-        return ResponseEntity.ok(body);
+        return ResponseEntity.ok(new BatchStatusResponse(
+                job.getJobId(),
+                job.getStatus().name(),
+                job.getCompletedCount(),
+                job.getTotalCount(),
+                job.getUploadedCount(),
+                job.getFailedItems(),
+                assets));
     }
 
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "ZIP archive of generated images",
+            content = @Content(mediaType = "application/octet-stream",
+                schema = @Schema(type = "string", format = "binary"))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Job not found",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "409", description = "Job not finished yet",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/download")
-    public ResponseEntity<?> downloadJob(@PathVariable String jobId) {
+    public ResponseEntity<?> downloadJob(@PathVariable String jobId) throws IOException {
         BatchJob job = requireJob(jobId);
 
-        if (job.getStatus() != BatchStatus.DONE) {
+        if (job.getStatus() != BatchStatus.DONE && job.getStatus() != BatchStatus.PARTIAL) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Job not finished"));
+                    .body(new ErrorResponse(409, "Conflict", "Job not finished yet"));
         }
 
-        Path outputPath = Paths.get(job.getOutputPath());
-        if (!Files.isDirectory(outputPath)) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Output directory not found for job: " + jobId);
-        }
+        List<GeneratedAsset> assets = generatedAssetRepository.findByJobId(jobId);
 
-        StreamingResponseBody stream = out -> {
-            try (ZipOutputStream zos = new ZipOutputStream(out);
-                 Stream<Path> files = Files.walk(outputPath)) {
-                files.filter(Files::isRegularFile).forEach(file -> {
-                    String entryName = outputPath.relativize(file).toString();
-                    try {
+        RestClient restClient = RestClient.create();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            for (GeneratedAsset asset : assets) {
+                String entryName = asset.getProductId() + "_" + asset.getPoseId() + ".jpg";
+                try {
+                    byte[] bytes = restClient.get()
+                            .uri(URI.create(asset.getSecureUrl()))
+                            .retrieve()
+                            .body(byte[].class);
+                    if (bytes != null) {
                         zos.putNextEntry(new ZipEntry(entryName));
-                        Files.copy(file, zos);
+                        zos.write(bytes);
                         zos.closeEntry();
-                    } catch (IOException e) {
-                        throw new RuntimeException("Failed to add file to ZIP: " + entryName, e);
                     }
-                });
+                } catch (Exception e) {
+                    log.warn("Skipping asset id={} url={} — fetch failed: {}",
+                            asset.getId(), asset.getSecureUrl(), e.getMessage());
+                }
             }
-        };
+        }
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header("Content-Disposition", "attachment; filename=\"" + jobId + ".zip\"")
-                .body(stream);
+                .body(baos.toByteArray());
     }
 
-    // ---- parsing helpers ----
-
-    private List<CatalogProduct> parseIndividualGarments(List<MultipartFile> files,
-                                                          List<String> names,
-                                                          List<String> categories) throws IOException {
-        if (categories == null || categories.size() != files.size()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "garmentCategories is required for each file — send 'top' or 'bottom' " +
-                    "for each garmentFiles entry (same order, same count)");
-        }
-
-        List<CatalogProduct> products = new ArrayList<>();
-        for (int i = 0; i < files.size(); i++) {
-            // fall back to original filename (without extension) if garmentNames not sent
-            String name = (names != null && i < names.size() && !names.get(i).isBlank())
-                    ? names.get(i).trim()
-                    : stripExtension(files.get(i).getOriginalFilename());
-            String category = mapCategory(categories.get(i).trim());
-            byte[] bytes    = files.get(i).getBytes();
-            products.add(new CatalogProduct(name, category, bytes));
-        }
-        return products;
-    }
-
-    private static String stripExtension(String filename) {
-        if (filename == null) return "garment";
-        int dot = filename.lastIndexOf('.');
-        return (dot > 0) ? filename.substring(0, dot) : filename;
-    }
+    // ---- ZIP parsing ----
 
     /**
      * Parses a ZIP with the structure:
-     *   tops/&lt;productId&gt;/&lt;image.png&gt;
-     *   bottoms/&lt;productId&gt;/&lt;image.png&gt;
-     * The top-level folder name determines category; the subfolder name is the product ID.
+     *   GarmentName/front.jpg
+     *   GarmentName/back.jpg
+     *   GarmentName/side.jpg
+     *   GarmentName/category.txt   (contains "upper_body" or "lower_body")
+     *
+     * Files at the top level or deeper than one subfolder are ignored.
+     * Throws ZipValidationException if any garment subfolder is missing required files.
      */
-    private List<CatalogProduct> parseZipCatalog(MultipartFile catalog) throws IOException {
-        Map<String, CatalogProduct> byProductId = new LinkedHashMap<>();
+    private List<GarmentZipEntry> parseGarmentZip(MultipartFile garmentZip) throws IOException {
+        Map<String, Map<String, byte[]>> angleImages = new LinkedHashMap<>();
+        Map<String, String> categories = new LinkedHashMap<>();
 
-        try (ZipInputStream zis = new ZipInputStream(catalog.getInputStream())) {
+        try (ZipInputStream zis = new ZipInputStream(garmentZip.getInputStream())) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (entry.isDirectory()) { zis.closeEntry(); continue; }
 
-                String path  = entry.getName().replace('\\', '/');
-                String[] parts = path.split("/");
-
-                // look for tops|bottoms / productId / filename at any nesting level
-                String categoryFolder = null;
-                String productId      = null;
-                String filename       = null;
-
-                for (int i = 0; i <= parts.length - 3; i++) {
-                    if (parts[i].equalsIgnoreCase("tops") || parts[i].equalsIgnoreCase("bottoms")) {
-                        categoryFolder = parts[i];
-                        productId      = parts[i + 1];
-                        filename       = parts[parts.length - 1];
-                        break;
-                    }
-                }
-
-                if (categoryFolder == null || !BatchService.isImageFile(filename)) {
+                String path = entry.getName().replace('\\', '/');
+                // Skip macOS metadata and hidden files
+                if (path.startsWith("__MACOSX/") || path.contains("/.")) {
                     zis.closeEntry();
                     continue;
                 }
 
-                // take first image per product
-                if (!byProductId.containsKey(productId)) {
-                    String category = mapCategory(
-                            categoryFolder.equalsIgnoreCase("tops") ? "top" : "bottom");
-                    byProductId.put(productId, new CatalogProduct(productId, category, zis.readAllBytes()));
+                String[] parts = path.split("/");
+                // Need at least garmentFolder/filename — skip root-level files
+                if (parts.length < 2) { zis.closeEntry(); continue; }
+
+                // Use the immediate parent folder as the garment name regardless of nesting depth.
+                // Handles both GarmentName/file.png and WrapperFolder/GarmentName/file.png.
+                String garmentName   = parts[parts.length - 2];
+                String lowerFilename = parts[parts.length - 1].toLowerCase();
+
+                if (lowerFilename.equals("category.txt")) {
+                    String content = new String(zis.readAllBytes(), StandardCharsets.UTF_8)
+                            .trim().toLowerCase();
+                    categories.put(garmentName, content);
+                } else {
+                    // Accept front/back/side with any image extension (.jpg, .jpeg, .png)
+                    int dot = lowerFilename.lastIndexOf('.');
+                    if (dot > 0) {
+                        String basename  = lowerFilename.substring(0, dot);
+                        String extension = lowerFilename.substring(dot + 1);
+                        boolean isImage  = extension.equals("jpg") || extension.equals("jpeg")
+                                        || extension.equals("png");
+                        if (isImage && (basename.equals("front") || basename.equals("back")
+                                     || basename.equals("side"))) {
+                            angleImages
+                                    .computeIfAbsent(garmentName, k -> new LinkedHashMap<>())
+                                    .put(basename, zis.readAllBytes());
+                        }
+                    }
                 }
+
                 zis.closeEntry();
             }
         }
 
-        return new ArrayList<>(byProductId.values());
-    }
+        Set<String> allGarments = new LinkedHashSet<>(angleImages.keySet());
+        allGarments.addAll(categories.keySet());
 
-    private static String mapCategory(String frontendCategory) {
-        return switch (frontendCategory.toLowerCase()) {
-            case "top"    -> "upper_body";
-            case "bottom" -> "lower_body";
-            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Unknown garment category: '" + frontendCategory + "'. Use 'top' or 'bottom'");
-        };
+        if (allGarments.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No garment subfolders found in ZIP");
+        }
+
+        // Validate each garment has all four required files with valid content
+        List<ZipValidationErrorResponse.GarmentError> errors = new ArrayList<>();
+
+        for (String garmentName : allGarments) {
+            Map<String, byte[]> poses    = angleImages.getOrDefault(garmentName, Map.of());
+            String              category = categories.get(garmentName);
+
+            List<String> found   = new ArrayList<>();
+            List<String> missing = new ArrayList<>();
+
+            for (String pose : List.of("front", "back", "side")) {
+                if (poses.containsKey(pose)) found.add(pose + ".jpg");
+                else                          missing.add(pose + ".jpg");
+            }
+
+            if (category == null) {
+                missing.add("category.txt");
+            } else {
+                found.add("category.txt");
+                if (!category.equals("upper_body") && !category.equals("lower_body")) {
+                    missing.add("category.txt (must be 'upper_body' or 'lower_body', got: '"
+                            + category + "')");
+                }
+            }
+
+            if (!missing.isEmpty()) {
+                errors.add(new ZipValidationErrorResponse.GarmentError(garmentName, found, missing));
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new ZipValidationException(new ZipValidationErrorResponse(
+                    400,
+                    "Bad Request",
+                    "ZIP validation failed: one or more garment folders are missing required files",
+                    errors));
+        }
+
+        return allGarments.stream()
+                .map(name -> new GarmentZipEntry(name, categories.get(name), angleImages.get(name)))
+                .toList();
     }
 
     private BatchJob requireJob(String jobId) {
