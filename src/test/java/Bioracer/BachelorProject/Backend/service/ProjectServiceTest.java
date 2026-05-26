@@ -1,0 +1,141 @@
+package Bioracer.BachelorProject.Backend.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import Bioracer.BachelorProject.Backend.controller.DTO.ProjectInput;
+import Bioracer.BachelorProject.Backend.exception.UserException;
+import Bioracer.BachelorProject.Backend.model.Project;
+import Bioracer.BachelorProject.Backend.model.Role;
+import Bioracer.BachelorProject.Backend.model.User;
+import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
+import Bioracer.BachelorProject.Backend.repository.UserRepository;
+
+@ExtendWith(MockitoExtension.class)
+class ProjectServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @InjectMocks
+    private ProjectService projectService;
+
+    private User owner;
+
+    @BeforeEach
+    void setUp() {
+        owner = new User("Jane", "Doe", "jane@example.com", "hashed", Role.USER);
+        ReflectionTestUtils.setField(owner, "id", 1000L);
+    }
+
+    @Test
+    void createProjectStoresCoverAndGalleryUrls() {
+        ProjectInput input = new ProjectInput(
+                "Race Dashboard",
+                "https://res.cloudinary.com/demo/image/upload/v1/cover.jpg",
+                List.of(
+                        "https://res.cloudinary.com/demo/image/upload/v1/gallery-1.jpg",
+                        "https://res.cloudinary.com/demo/image/upload/v1/gallery-2.jpg"));
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        ArgumentCaptor<Project> projectCaptor = ArgumentCaptor.forClass(Project.class);
+        verify(projectRepository).save(projectCaptor.capture());
+
+        Project savedProject = projectCaptor.getValue();
+        assertThat(savedProject.getCoverImage()).isEqualTo(input.coverImage());
+        assertThat(savedProject.getImages()).containsExactlyElementsOf(input.images());
+        assertThat(created.getImages()).containsExactlyElementsOf(input.images());
+    }
+
+    @Test
+    void updateProjectDetailsUpdatesCoverAndGalleryUrls() {
+        Project existing = new Project(
+                "Old Name",
+                owner,
+                "https://res.cloudinary.com/demo/image/upload/v1/old-cover.jpg",
+                List.of("https://res.cloudinary.com/demo/image/upload/v1/old-gallery.jpg"));
+        ReflectionTestUtils.setField(existing, "id", 12L);
+
+        ProjectInput input = new ProjectInput(
+                "New Name",
+                "https://res.cloudinary.com/demo/image/upload/v1/new-cover.jpg",
+                List.of("https://res.cloudinary.com/demo/image/upload/v1/new-gallery.jpg"));
+
+        when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
+        when(projectRepository.save(existing)).thenReturn(existing);
+
+        Project updated = projectService.updateProjectDetails(12L, input, 1000L);
+
+        assertThat(updated.getName()).isEqualTo("New Name");
+        assertThat(updated.getCoverImage()).isEqualTo(input.coverImage());
+        assertThat(updated.getImages()).containsExactlyElementsOf(input.images());
+    }
+
+    @Test
+    void getProjectByIdReturnsProjectForOwner() {
+        Project existing = new Project(
+                "Project",
+                owner,
+                "https://res.cloudinary.com/demo/image/upload/v1/cover.jpg",
+                List.of("https://res.cloudinary.com/demo/image/upload/v1/gallery.jpg"));
+        ReflectionTestUtils.setField(existing, "id", 77L);
+
+        when(projectRepository.findById(77L)).thenReturn(Optional.of(existing));
+
+        Project found = projectService.getProjectById(77L, 1000L);
+
+        assertThat(found.getId()).isEqualTo(77L);
+        assertThat(found.getImages()).containsExactly("https://res.cloudinary.com/demo/image/upload/v1/gallery.jpg");
+    }
+
+    @Test
+    void getProjectByIdThrowsWhenRequesterDoesNotOwnProject() {
+        Project existing = new Project("Project", owner);
+        ReflectionTestUtils.setField(existing, "id", 77L);
+
+        when(projectRepository.findById(77L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> projectService.getProjectById(77L, 2000L))
+                .isInstanceOf(UserException.class)
+                .hasMessage("Not authorized!");
+    }
+
+    @Test
+    void updateProjectDetailsThrowsWhenRequesterDoesNotOwnProject() {
+        Project existing = new Project("Project", owner);
+        ReflectionTestUtils.setField(existing, "id", 12L);
+
+        ProjectInput input = new ProjectInput(
+                "New Name",
+                "https://res.cloudinary.com/demo/image/upload/v1/new-cover.jpg",
+                List.of("https://res.cloudinary.com/demo/image/upload/v1/new-gallery.jpg"));
+
+        when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> projectService.updateProjectDetails(12L, input, 2000L))
+                .isInstanceOf(UserException.class)
+                .hasMessage("Not authorized!");
+    }
+}

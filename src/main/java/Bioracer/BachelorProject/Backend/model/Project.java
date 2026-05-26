@@ -1,15 +1,19 @@
 package Bioracer.BachelorProject.Backend.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +35,10 @@ public class Project {
 
     private String coverImage;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "project_images", joinColumns = @JoinColumn(name = "project_id"))
+    @Column(name = "image_url")
+    @OrderColumn(name = "image_index")
     private List<String> images;
 
     protected Project() {
@@ -87,7 +95,7 @@ public class Project {
     }
 
     public void setImages(List<String> images) {
-        this.images = images;
+        this.images = images == null ? null : new ArrayList<>(images);
     }
 
     @Override
