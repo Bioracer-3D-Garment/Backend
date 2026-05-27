@@ -30,7 +30,11 @@ jwt:
 
 pipeline:
   poses-dir: /home/eliasxmas/UCLL/Jaar 3/Semester 2/Bachelor Project/Bioracer 3D Garment/Backend/src/main/resources/poses
-  output-dir: /home/eliasxmas/bioracer/output
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key:    ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
 
 vton:
   adapter: fashn

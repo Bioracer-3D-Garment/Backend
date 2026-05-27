@@ -47,8 +47,8 @@ public class FashnAdapter implements VTONAdapter {
         inputs.put("model_image",      modelImage);
         inputs.put("product_image",    productImage);
         inputs.put("prompt",           effectivePrompt);
-        inputs.put("resolution",       "4k");
-        inputs.put("generation_mode",  "quality");
+        inputs.put("resolution",       "1k");
+        inputs.put("generation_mode",  "balanced");
         inputs.put("num_images",       1);
         inputs.put("output_format",    "png");
 

@@ -4,6 +4,7 @@ import Bioracer.BachelorProject.Backend.controller.DTO.ProjectInput;
 import Bioracer.BachelorProject.Backend.model.Project;
 import Bioracer.BachelorProject.Backend.service.JwtService;
 import Bioracer.BachelorProject.Backend.service.ProjectService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -35,7 +36,7 @@ public class ProjectController {
     // only users and admin
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/user")
-    public List<Project> getAllByUserId(@RequestHeader("Authorization") String authHeader) {
+    public List<Project> getAllByUserId(@Parameter(hidden = true) @RequestHeader("Authorization") String authHeader) {
         Long userId = extractIdFromHeader(authHeader);
         return projectService.getAllProjectsByUserId(userId);
     }
@@ -43,7 +44,7 @@ public class ProjectController {
     // only users and admin
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/id")
-    public Project getById(@RequestParam Long id, @RequestHeader("Authorization") String authHeader) {
+    public Project getById(@RequestParam Long id, @Parameter(hidden = true) @RequestHeader("Authorization") String authHeader) {
         Long userId = extractIdFromHeader(authHeader);
         return projectService.getProjectById(id, userId);
     }
@@ -52,7 +53,7 @@ public class ProjectController {
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping()
     public Project createProject(@Valid @RequestBody ProjectInput projectInput,
-            @RequestHeader("Authorization") String authHeader) {
+            @Parameter(hidden = true) @RequestHeader("Authorization") String authHeader) {
         Long userId = extractIdFromHeader(authHeader);
         return projectService.createProject(projectInput, userId);
     }
