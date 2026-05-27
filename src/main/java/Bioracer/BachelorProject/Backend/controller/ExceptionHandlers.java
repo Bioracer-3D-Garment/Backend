@@ -2,6 +2,7 @@ package Bioracer.BachelorProject.Backend.controller;
 
 import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.ZipValidationErrorResponse;
+import Bioracer.BachelorProject.Backend.exception.ModelException;
 import Bioracer.BachelorProject.Backend.exception.NotFoundException;
 import Bioracer.BachelorProject.Backend.exception.UserException;
 import Bioracer.BachelorProject.Backend.exception.ZipValidationException;
@@ -33,6 +34,12 @@ public class ExceptionHandlers {
     @ExceptionHandler(UserException.class)
     @ResponseStatus(HttpStatus.PRECONDITION_FAILED)
     public ErrorResponse handleUserException(UserException ex) {
+        return new ErrorResponse(412, "Precondition Failed", ex.getMessage());
+    }
+
+    @ExceptionHandler(ModelException.class)
+    @ResponseStatus(HttpStatus.PRECONDITION_FAILED)
+    public ErrorResponse handleModelException(ModelException ex) {
         return new ErrorResponse(412, "Precondition Failed", ex.getMessage());
     }
 
