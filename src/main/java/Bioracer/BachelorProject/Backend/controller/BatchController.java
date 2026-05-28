@@ -8,10 +8,9 @@ import Bioracer.BachelorProject.Backend.controller.DTO.ZipValidationErrorRespons
 import Bioracer.BachelorProject.Backend.exception.ZipValidationException;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
-import Bioracer.BachelorProject.Backend.pipeline.models.BatchJobRepository;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
+import Bioracer.BachelorProject.Backend.pipeline.repository.BatchJobRepository;
 import Bioracer.BachelorProject.Backend.pipeline.services.BatchService;
-import Bioracer.BachelorProject.Backend.pipeline.utils.GarmentZipEntry;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,21 +25,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 @RestController
@@ -89,25 +81,8 @@ public class BatchController {
             @RequestParam("gender")     String gender,
             @RequestParam("folderId")   Long folderId) throws IOException {
 
-        List<GarmentZipEntry> garments = parseGarmentZip(garmentZip);
+        BatchJob job = batchService.submitBatch(garmentZip, gender, folderId);
 
-        String normalizedGender = gender.trim().toLowerCase();
-
-        // Validate server-side pose directories before creating the job
-        for (String angle : List.of("front", "back", "side")) {
-            try {
-                batchService.resolvePoseFileForAngle(normalizedGender, angle);
-            } catch (IllegalStateException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-            }
-        }
-
-        int total = garments.size() * 3;
-        BatchJob job = batchService.createJob(total, folderId);
-        batchService.runBatch(job.getJobId(), garments, normalizedGender);
-
-        log.info("Submitted batch job {} — {} garments, {} combinations, gender={}",
-                job.getJobId(), garments.size(), total, normalizedGender);
         return ResponseEntity.accepted().body(new BatchSubmitResponse(job.getJobId()));
     }
 
@@ -191,119 +166,6 @@ public class BatchController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header("Content-Disposition", "attachment; filename=\"" + jobId + ".zip\"")
                 .body(baos.toByteArray());
-    }
-
-    // ---- ZIP parsing ----
-
-    /**
-     * Parses a ZIP with the structure:
-     *   GarmentName/front.jpg
-     *   GarmentName/back.jpg
-     *   GarmentName/side.jpg
-     *   GarmentName/category.txt   (contains "upper_body" or "lower_body")
-     *
-     * Files at the top level or deeper than one subfolder are ignored.
-     * Throws ZipValidationException if any garment subfolder is missing required files.
-     */
-    private List<GarmentZipEntry> parseGarmentZip(MultipartFile garmentZip) throws IOException {
-        Map<String, Map<String, byte[]>> angleImages = new LinkedHashMap<>();
-        Map<String, String> categories = new LinkedHashMap<>();
-
-        try (ZipInputStream zis = new ZipInputStream(garmentZip.getInputStream())) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (entry.isDirectory()) { zis.closeEntry(); continue; }
-
-                String path = entry.getName().replace('\\', '/');
-                // Skip macOS metadata and hidden files
-                if (path.startsWith("__MACOSX/") || path.contains("/.")) {
-                    zis.closeEntry();
-                    continue;
-                }
-
-                String[] parts = path.split("/");
-                // Need at least garmentFolder/filename — skip root-level files
-                if (parts.length < 2) { zis.closeEntry(); continue; }
-
-                // Use the immediate parent folder as the garment name regardless of nesting depth.
-                // Handles both GarmentName/file.png and WrapperFolder/GarmentName/file.png.
-                String garmentName   = parts[parts.length - 2];
-                String lowerFilename = parts[parts.length - 1].toLowerCase();
-
-                if (lowerFilename.equals("category.txt")) {
-                    String content = new String(zis.readAllBytes(), StandardCharsets.UTF_8)
-                            .trim().toLowerCase();
-                    categories.put(garmentName, content);
-                } else {
-                    // Accept front/back/side with any image extension (.jpg, .jpeg, .png)
-                    int dot = lowerFilename.lastIndexOf('.');
-                    if (dot > 0) {
-                        String basename  = lowerFilename.substring(0, dot);
-                        String extension = lowerFilename.substring(dot + 1);
-                        boolean isImage  = extension.equals("jpg") || extension.equals("jpeg")
-                                        || extension.equals("png");
-                        if (isImage && (basename.equals("front") || basename.equals("back")
-                                     || basename.equals("side"))) {
-                            angleImages
-                                    .computeIfAbsent(garmentName, k -> new LinkedHashMap<>())
-                                    .put(basename, zis.readAllBytes());
-                        }
-                    }
-                }
-
-                zis.closeEntry();
-            }
-        }
-
-        Set<String> allGarments = new LinkedHashSet<>(angleImages.keySet());
-        allGarments.addAll(categories.keySet());
-
-        if (allGarments.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "No garment subfolders found in ZIP");
-        }
-
-        // Validate each garment has all four required files with valid content
-        List<ZipValidationErrorResponse.GarmentError> errors = new ArrayList<>();
-
-        for (String garmentName : allGarments) {
-            Map<String, byte[]> poses    = angleImages.getOrDefault(garmentName, Map.of());
-            String              category = categories.get(garmentName);
-
-            List<String> found   = new ArrayList<>();
-            List<String> missing = new ArrayList<>();
-
-            for (String pose : List.of("front", "back", "side")) {
-                if (poses.containsKey(pose)) found.add(pose + ".jpg");
-                else                          missing.add(pose + ".jpg");
-            }
-
-            if (category == null) {
-                missing.add("category.txt");
-            } else {
-                found.add("category.txt");
-                if (!category.equals("upper_body") && !category.equals("lower_body")) {
-                    missing.add("category.txt (must be 'upper_body' or 'lower_body', got: '"
-                            + category + "')");
-                }
-            }
-
-            if (!missing.isEmpty()) {
-                errors.add(new ZipValidationErrorResponse.GarmentError(garmentName, found, missing));
-            }
-        }
-
-        if (!errors.isEmpty()) {
-            throw new ZipValidationException(new ZipValidationErrorResponse(
-                    400,
-                    "Bad Request",
-                    "ZIP validation failed: one or more garment folders are missing required files",
-                    errors));
-        }
-
-        return allGarments.stream()
-                .map(name -> new GarmentZipEntry(name, categories.get(name), angleImages.get(name)))
-                .toList();
     }
 
     private BatchJob requireJob(String jobId) {
