@@ -42,10 +42,11 @@ public class GeneratedAsset {
 
     private LocalDateTime createdAt;
 
-    protected GeneratedAsset() {}
+    protected GeneratedAsset() {
+    }
 
     public GeneratedAsset(Project project, String jobId, String productId, String poseId,
-                          String category, String secureUrl, String thumbnailUrl, String publicId) {
+            String category, String secureUrl, String thumbnailUrl, String publicId) {
         this.project = project;
         this.jobId = jobId;
         this.productId = productId;
@@ -57,14 +58,43 @@ public class GeneratedAsset {
         this.createdAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public Project getProject() { return project; }
-    public String getJobId() { return jobId; }
-    public String getProductId() { return productId; }
-    public String getPoseId() { return poseId; }
-    public String getCategory() { return category; }
-    public String getSecureUrl() { return secureUrl; }
-    public String getThumbnailUrl() { return thumbnailUrl; }
-    public String getPublicId() { return publicId; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public Project getProject() {
+        return project;
+    }
+
+    public String getJobId() {
+        return jobId;
+    }
+
+    public String getProductId() {
+        return productId;
+    }
+
+    public String getPoseId() {
+        return poseId;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public String getSecureUrl() {
+        return secureUrl;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
+    }
+
+    public String getPublicId() {
+        return publicId;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }
