@@ -11,7 +11,8 @@ public record GeneratedAssetResponse(
         String category,
         String secureUrl,
         String thumbnailUrl,
-        String createdAt) {
+        String createdAt,
+        String publicId) {
 
     public static GeneratedAssetResponse from(GeneratedAsset entity) {
         return new GeneratedAssetResponse(
@@ -23,6 +24,7 @@ public record GeneratedAssetResponse(
                 entity.getCategory(),
                 entity.getSecureUrl(),
                 entity.getThumbnailUrl(),
-                entity.getCreatedAt().toString());
+                entity.getCreatedAt().toString(),
+                entity.getPublicId());
     }
 }

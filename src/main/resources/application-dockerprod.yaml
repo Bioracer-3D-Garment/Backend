@@ -16,7 +16,7 @@ spring:
         "[auto_quote_keyword]": true
         "[format_sql]": true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${DDL_AUTO}
 
 springdoc:
   server-url: ${API_URL}
@@ -30,6 +30,12 @@ jwt:
   secret-key: ${JWT_SECRET_KEY}
 
 cloudinary:
+<<<<<<< HEAD
   cloud-name: ${CLOUDINARY_CLOUD_NAME:${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:}}
   api-key:    ${CLOUDINARY_API_KEY:${NEXT_PUBLIC_CLOUDINARY_API_KEY:}}
   api-secret: ${CLOUDINARY_API_SECRET:${NEXT_PUBLIC_CLOUDINARY_API_SECRET:}}
+=======
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+>>>>>>> d80366a35abd8c26131e130ea0f374ab270b2a16

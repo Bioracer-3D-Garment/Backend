@@ -22,19 +22,20 @@ public class AssetService {
     private final CloudinaryService cloudinaryService;
 
     public AssetService(GeneratedAssetRepository assetRepository,
-                        ProjectRepository projectRepository,
-                        CloudinaryService cloudinaryService) {
+            ProjectRepository projectRepository,
+            CloudinaryService cloudinaryService) {
         this.assetRepository = assetRepository;
         this.projectRepository = projectRepository;
         this.cloudinaryService = cloudinaryService;
     }
 
     public record ProjectAssetsPage(Long projectId, long totalCount, int page, int size,
-                                    List<GeneratedAssetResponse> assets) {}
+            List<GeneratedAssetResponse> assets) {
+    }
 
     public ProjectAssetsPage getProjectAssets(Long projectId, Long userId,
-                                              String jobId, String category,
-                                              int page, int size) {
+            String jobId, String category,
+            int page, int size) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Project not found: " + projectId));
