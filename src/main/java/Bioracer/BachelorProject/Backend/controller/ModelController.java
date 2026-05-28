@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import Bioracer.BachelorProject.Backend.controller.DTO.ModelInput;
 import Bioracer.BachelorProject.Backend.model.Model;
 import Bioracer.BachelorProject.Backend.service.ModelService;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
 
 @RestController
