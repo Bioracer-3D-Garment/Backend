@@ -1,7 +1,5 @@
 package Bioracer.BachelorProject.Backend.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -15,7 +13,6 @@ import jakarta.validation.constraints.NotNull;
 public class Model {
     private String coverImage;
 
-    @JsonIgnore
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,7 +35,7 @@ public class Model {
     protected Model() {
     }
 
-    public Model(String Name, String front, String back, String side,
+    public Model(String name, String front, String back, String side,
             Gender gender) {
         setName(name);
         setFront(front);
