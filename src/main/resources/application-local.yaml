@@ -16,7 +16,11 @@ spring:
         "[auto_quote_keyword]": true
         "[format_sql]": true
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+    enabled: true
+    baseline-on-migrate: false
 springdoc:
   server-url: ${API_URL}
 
