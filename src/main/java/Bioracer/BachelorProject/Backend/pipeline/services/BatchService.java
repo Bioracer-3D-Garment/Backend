@@ -6,12 +6,9 @@ import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
 import Bioracer.BachelorProject.Backend.pipeline.models.FailedItem;
 import Bioracer.BachelorProject.Backend.pipeline.repository.BatchJobRepository;
-import Bioracer.BachelorProject.Backend.pipeline.utils.GarmentZipEntry;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
 import Bioracer.BachelorProject.Backend.service.CloudinaryService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
@@ -19,26 +16,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.stream.Stream;
 
 // Java 21 virtual threads required: Executors.newVirtualThreadPerTaskExecutor() is used for
@@ -46,16 +37,9 @@ import java.util.stream.Stream;
 @Service
 public class BatchService {
 
-    private static final Logger log = LoggerFactory.getLogger(BatchService.class);
-
-    private static final int MAX_RETRIES    = 3;
-    private static final long RETRY_WAIT_MS = 2_000;
-
-    private static final List<String> ANGLES = List.of("front", "back", "side");
-
-    private static final DateTimeFormatter RUN_ID_FMT =
-            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-
+    private static final int maxRetries = 3;
+    private static final long retryWaitMs = 2000;
+    private static final List<String> positions = List.of("front", "back", "side");
     private final VTONAdapter adapter;
     private final BatchJobRepository jobRepository;
     private final CloudinaryService cloudinaryService;
@@ -83,31 +67,33 @@ public class BatchService {
                     "Project not found: " + folderId);
         }
         String jobId = UUID.randomUUID().toString();
-        String runId = "run_" + LocalDateTime.now().format(RUN_ID_FMT);
+        String runId = "run_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         return jobRepository.save(new BatchJob(jobId, runId, null, totalCount, folderId));
     }
 
-    public BatchJob submitBatch(MultipartFile garmentZip, String gender, Long folderId) throws IOException {
-        String normalizedGender = normalizeGender(gender);
-        validatePoseDirectories(normalizedGender);
+    public BatchJob submitBatch(MultipartFile frontDesign,
+                                MultipartFile backDesign,
+                                Long modelId,
+                                Long folderId) throws IOException {
 
-        List<GarmentZipEntry> garments = parseGarmentZip(garmentZip);
-        int total = garments.size() * ANGLES.size();
+        String productId = resolveProductId(frontDesign.getOriginalFilename());
+        byte[] frontDesignBytes = frontDesign.getBytes();
+        byte[] backDesignBytes = backDesign.getBytes();
 
-        BatchJob job = createJob(total, folderId);
-        runBatch(job.getJobId(), garments, normalizedGender);
+        BatchJob job = createJob(positions.size(), folderId);
+        runBatch(job.getJobId(), productId, frontDesignBytes, backDesignBytes, modelId);
         return job;
     }
 
     /**
-     * Returns the single pose image for the given gender and angle.
+     * Returns the single pose image for the given modelId and pose.
      * Throws IllegalStateException if the directory is missing or contains no images.
      */
-    public Path resolvePoseFileForAngle(String gender, String angle) {
-        Path dir = Paths.get(posesDir, gender, angle);
+    public Path resolvePoseFileForpose(Long modelId, String pose) {
+        Path dir = Paths.get(posesDir, modelId.toString(), pose);
         if (!Files.isDirectory(dir)) {
             throw new IllegalStateException(
-                    "No pose directory for gender='" + gender + "' angle='" + angle + "': " + dir);
+                    "No pose directory for modelId='" + modelId + "' Position='" + pose + "': " + dir);
         }
         try (Stream<Path> stream = Files.list(dir)) {
             return stream
@@ -120,90 +106,12 @@ public class BatchService {
         }
     }
 
-    private void validatePoseDirectories(String gender) {
-        for (String angle : ANGLES) {
-            try {
-                resolvePoseFileForAngle(gender, angle);
-            } catch (IllegalStateException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-            }
-        }
-    }
-
-    private String normalizeGender(String gender) {
-        if (gender == null || gender.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Gender is required");
-        }
-        return gender.trim().toLowerCase();
-    }
-
-    private List<GarmentZipEntry> parseGarmentZip(MultipartFile garmentZip) throws IOException {
-        Map<String, Map<String, byte[]>> garmentImages = new LinkedHashMap<>();
-        Map<String, String> garmentCategories = new LinkedHashMap<>();
-
-        try (ZipInputStream zipInputStream = new ZipInputStream(garmentZip.getInputStream())) {
-            ZipEntry entry;
-            while ((entry = zipInputStream.getNextEntry()) != null) {
-                if (entry.isDirectory()) {
-                    continue;
-                }
-
-                String normalizedPath = entry.getName().replace('\\', '/');
-                String[] parts = normalizedPath.split("/");
-                if (parts.length < 2) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "Invalid garment ZIP entry: " + entry.getName());
-                }
-
-                String garmentName = parts[0];
-                String fileName = parts[parts.length - 1].toLowerCase();
-                byte[] bytes = zipInputStream.readAllBytes();
-
-                garmentImages.computeIfAbsent(garmentName, key -> new LinkedHashMap<>());
-
-                if ("category.txt".equals(fileName)) {
-                    garmentCategories.put(garmentName, new String(bytes, StandardCharsets.UTF_8).trim().toLowerCase());
-                } else if (isImageFile(fileName)) {
-                    String angle = fileName.substring(0, fileName.lastIndexOf('.'));
-                    if (!ANGLES.contains(angle)) {
-                        continue;
-                    }
-                    garmentImages.get(garmentName).put(angle, bytes);
-                }
-            }
-        }
-
-        List<GarmentZipEntry> garments = new ArrayList<>();
-        for (Map.Entry<String, Map<String, byte[]>> garmentEntry : garmentImages.entrySet()) {
-            String garmentName = garmentEntry.getKey();
-            Map<String, byte[]> angleImages = garmentEntry.getValue();
-            String category = garmentCategories.get(garmentName);
-
-            if (category == null || category.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Missing category.txt for garment: " + garmentName);
-            }
-
-            for (String angle : ANGLES) {
-                if (!angleImages.containsKey(angle)) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "Missing " + angle + ".jpg for garment: " + garmentName);
-                }
-            }
-
-            garments.add(new GarmentZipEntry(garmentName, category, angleImages));
-        }
-
-        if (garments.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "No garments found in uploaded ZIP");
-        }
-
-        return garments;
-    }
-
     @Async
-    public void runBatch(String jobId, List<GarmentZipEntry> garments, String gender) {
+    public void runBatch(String jobId,
+                         String productId,
+                         byte[] frontDesignBytes,
+                         byte[] backDesignBytes,
+                         Long modelId) {
         BatchJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -211,9 +119,7 @@ public class BatchService {
             job.setStatus(BatchStatus.RUNNING);
             jobRepository.save(job);
 
-            log.info("Batch job {} started: {} combinations", jobId, job.getTotalCount());
-
-            List<FailedItem> failedItems = processAllCombinations(job, garments, gender);
+            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, modelId);
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
@@ -224,41 +130,39 @@ public class BatchService {
                 job.setStatus(BatchStatus.FAILED);
             }
             jobRepository.save(job);
-            log.info("Batch job {} finished — status={} failed={}",
-                    jobId, job.getStatus(), failedItems.size());
 
         } catch (Exception e) {
-            log.error("Batch job {} encountered a fatal error", jobId, e);
             fail(job, e.getMessage());
+            throw new IllegalStateException("Batch job failed: " + jobId, e);
         }
     }
 
     // ---- private helpers ----
 
     private List<FailedItem> processAllCombinations(BatchJob job,
-                                                     List<GarmentZipEntry> garments,
-                                                     String gender) {
+                                                     String productId,
+                                                     byte[] frontDesignBytes,
+                                                     byte[] backDesignBytes,
+                                                     Long modelId) {
         List<FailedItem> failedItems = new CopyOnWriteArrayList<>();
         List<Future<?>> futures = new ArrayList<>();
 
-        // Virtual threads: one per garment×angle combination for maximum I/O concurrency
+        // Virtual threads: one per garment×pose combination for maximum I/O concurrency
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (GarmentZipEntry garment : garments) {
-                for (String angle : ANGLES) {
-                    futures.add(executor.submit(() -> {
-                        Optional<String> failure = processOneWithRetry(garment, angle, gender, job);
-                        failure.ifPresent(reason ->
-                                failedItems.add(new FailedItem(garment.garmentName(), angle, reason)));
-                        recordCompleted(job);
-                    }));
-                }
+            for (String pose : positions) {
+                futures.add(executor.submit(() -> {
+                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, modelId, job);
+                    failure.ifPresent(reason ->
+                            failedItems.add(new FailedItem(productId, pose, reason)));
+                    recordCompleted(job);
+                }));
             }
 
             for (Future<?> f : futures) {
                 try {
                     f.get();
                 } catch (Exception e) {
-                    log.error("Unexpected executor error", e);
+                    throw new IllegalStateException("Unexpected executor error", e);
                 }
             }
         }
@@ -267,55 +171,51 @@ public class BatchService {
     }
 
     /** Returns empty on success, or the failure reason string. */
-    private Optional<String> processOneWithRetry(GarmentZipEntry garment,
-                                                  String angle,
-                                                  String gender,
+    private Optional<String> processOneWithRetry(String productId,
+                                                  byte[] frontDesignBytes,
+                                                  byte[] backDesignBytes,
+                                                  String pose,
+                                                  Long modelId,
                                                   BatchJob job) {
         Path poseFile;
         try {
-            poseFile = resolvePoseFileForAngle(gender, angle);
+            poseFile = resolvePoseFileForpose(modelId, pose);
         } catch (IllegalStateException e) {
             return Optional.of("Pose directory missing: " + e.getMessage());
         }
 
-        byte[] garmentBytes = garment.angleImages().get(angle);
-        // Cloudinary path: bioracer/{projectId}/{garmentName}/{pose}
         String cloudinaryPublicId = "bioracer/" + job.getFolderId()
-                + "/" + garment.garmentName() + "/" + angle;
+                + "/" + productId + "/" + pose;
         String lastError = null;
 
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 byte[] poseBytes = Files.readAllBytes(poseFile);
-                byte[] result = adapter.generate(garmentBytes, poseBytes, garment.category(), null);
+                byte[] result = adapter.generate(frontDesignBytes, backDesignBytes, poseBytes, null, null);
 
                 CloudinaryService.UploadResult uploadResult =
                         cloudinaryService.upload(result, cloudinaryPublicId);
 
-                // getReferenceById avoids loading the entity and is safe across session boundaries
                 GeneratedAsset asset = new GeneratedAsset(
                         projectRepository.getReferenceById(job.getFolderId()),
                         job.getJobId(),
-                        garment.garmentName(),
-                        angle,
-                        garment.category(),
+                        productId,
+                        pose,
+                        null,
                         uploadResult.secureUrl(),
                         uploadResult.thumbnailUrl(),
                         uploadResult.publicId());
                 generatedAssetRepository.save(asset);
                 recordUploaded(job);
 
-                log.info("Uploaded asset for garment={} angle={}", garment.garmentName(), angle);
                 return Optional.empty();
 
             } catch (Exception e) {
                 lastError = e.getMessage();
-                log.warn("Attempt {}/{} failed for garment={} angle={}: {}",
-                        attempt, MAX_RETRIES, garment.garmentName(), angle, lastError);
 
-                if (attempt < MAX_RETRIES) {
+                if (attempt < maxRetries) {
                     try {
-                        Thread.sleep(RETRY_WAIT_MS);
+                        Thread.sleep(retryWaitMs);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return Optional.of("interrupted");
@@ -324,9 +224,28 @@ public class BatchService {
             }
         }
 
-        log.error("All {} retries exhausted for garment={} angle={}", MAX_RETRIES,
-                garment.garmentName(), angle);
         return Optional.of(lastError != null ? lastError : "max retries exceeded");
+    }
+
+    private String resolveProductId(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "front-design";
+        }
+
+        String fileName = originalFilename.replace('\\', '/');
+        int lastSlash = fileName.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            fileName = fileName.substring(lastSlash + 1);
+        }
+
+        int extensionIndex = fileName.lastIndexOf('.');
+        return extensionIndex > 0 ? fileName.substring(0, extensionIndex) : fileName;
+    }
+
+    public static boolean isImageFile(String name) {
+        String lower = name.toLowerCase();
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                || lower.endsWith(".png") || lower.endsWith(".webp");
     }
 
     // completed increments on both success and failure so the progress bar reaches 100 %
@@ -346,9 +265,4 @@ public class BatchService {
         jobRepository.save(job);
     }
 
-    public static boolean isImageFile(String name) {
-        String lower = name.toLowerCase();
-        return lower.endsWith(".jpg") || lower.endsWith(".jpeg")
-                || lower.endsWith(".png") || lower.endsWith(".webp");
-    }
 }

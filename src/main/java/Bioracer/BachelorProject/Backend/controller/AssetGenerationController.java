@@ -1,24 +1,15 @@
 package Bioracer.BachelorProject.Backend.controller;
 
 import Bioracer.BachelorProject.Backend.controller.DTO.BatchStatusResponse;
-import Bioracer.BachelorProject.Backend.controller.DTO.BatchSubmitResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.GeneratedAssetResponse;
-import Bioracer.BachelorProject.Backend.controller.DTO.ZipValidationErrorResponse;
-import Bioracer.BachelorProject.Backend.exception.ZipValidationException;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
 import Bioracer.BachelorProject.Backend.pipeline.repository.BatchJobRepository;
 import Bioracer.BachelorProject.Backend.pipeline.services.BatchService;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,17 +28,14 @@ import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/batches")
-public class BatchController {
-
-    private static final Logger log = LoggerFactory.getLogger(BatchController.class);
-
+public class AssetGenerationController {
     private final BatchService batchService;
     private final BatchJobRepository jobRepository;
     private final GeneratedAssetRepository generatedAssetRepository;
 
-    public BatchController(BatchService batchService,
-                           BatchJobRepository jobRepository,
-                           GeneratedAssetRepository generatedAssetRepository) {
+    public AssetGenerationController(BatchService batchService,
+                                     BatchJobRepository jobRepository,
+                                     GeneratedAssetRepository generatedAssetRepository, Bioracer.BachelorProject.Backend.controller.ExceptionHandlers exceptionHandlers) {
         this.batchService = batchService;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
@@ -56,44 +44,32 @@ public class BatchController {
     /**
      * POST /batches
      *
-     * Accepts multipart/form-data with a single ZIP archive:
-     *   garmentZip  — ZIP with GarmentName/{front,back,side}.jpg + category.txt per subfolder
-     *   gender      — "male" | "female"
+     * Accepts multipart/form-data with separate garment views:
+     *   frontDesign — front view of the clothing item
+     *   backDesign  — back view of the clothing item
+     *   modelId     — model ID (required)
      *   folderId    — project ID (required)
-     *
-     * Every garment subfolder must contain front.jpg, back.jpg, side.jpg, and category.txt
-     * (containing "upper_body" or "lower_body"). Missing files → 400 with garmentErrors detail.
      */
-    @ApiResponses({
-        @ApiResponse(responseCode = "202", description = "Batch job accepted",
-            content = @Content(schema = @Schema(implementation = BatchSubmitResponse.class))),
-        @ApiResponse(responseCode = "400", description = "ZIP validation failed or missing parameters",
-            content = @Content(schema = @Schema(implementation = ZipValidationErrorResponse.class))),
-        @ApiResponse(responseCode = "401", description = "Unauthorized",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @ApiResponse(responseCode = "403", description = "Project not owned by caller",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<BatchSubmitResponse> submitBatch(
-            @RequestPart("garmentZip")  MultipartFile garmentZip,
-            @RequestParam("gender")     String gender,
-            @RequestParam("folderId")   Long folderId) throws IOException {
+    public ResponseEntity<String> submitBatch(
+            @RequestParam("frontDesign") MultipartFile frontDesign,
+            @RequestParam("backDesign") MultipartFile backDesign,
+            @RequestParam("modelId") Long modelId,
+            @RequestParam("folderId") Long folderId) {
+        BatchJob job;
+        try {
+            job = batchService.submitBatch(frontDesign, backDesign, modelId, folderId);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to process the uploaded garment images", e);
+        } catch (Exception e) {
+            throw e;
+        }
 
-        BatchJob job = batchService.submitBatch(garmentZip, gender, folderId);
-
-        return ResponseEntity.accepted().body(new BatchSubmitResponse(job.getJobId()));
+        return ResponseEntity.accepted().body("Job has been accepted: " + job.getJobId());
     }
 
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Job status",
-            content = @Content(schema = @Schema(implementation = BatchStatusResponse.class))),
-        @ApiResponse(responseCode = "401", description = "Unauthorized",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @ApiResponse(responseCode = "404", description = "Job not found",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/status")
     public ResponseEntity<BatchStatusResponse> getStatus(@PathVariable String jobId) {
@@ -117,17 +93,6 @@ public class BatchController {
                 assets));
     }
 
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "ZIP archive of generated images",
-            content = @Content(mediaType = "application/octet-stream",
-                schema = @Schema(type = "string", format = "binary"))),
-        @ApiResponse(responseCode = "401", description = "Unauthorized",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @ApiResponse(responseCode = "404", description = "Job not found",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-        @ApiResponse(responseCode = "409", description = "Job not finished yet",
-            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/download")
     public ResponseEntity<?> downloadJob(@PathVariable String jobId) throws IOException {
@@ -141,8 +106,8 @@ public class BatchController {
         List<GeneratedAsset> assets = generatedAssetRepository.findByJobId(jobId);
 
         RestClient restClient = RestClient.create();
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+        ByteArrayOutputStream zipArchiveBuffer = new ByteArrayOutputStream();
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(zipArchiveBuffer)) {
             for (GeneratedAsset asset : assets) {
                 String entryName = asset.getProductId() + "_" + asset.getPoseId() + ".jpg";
                 try {
@@ -151,13 +116,13 @@ public class BatchController {
                             .retrieve()
                             .body(byte[].class);
                     if (bytes != null) {
-                        zos.putNextEntry(new ZipEntry(entryName));
-                        zos.write(bytes);
-                        zos.closeEntry();
+                        zipOutputStream.putNextEntry(new ZipEntry(entryName));
+                        zipOutputStream.write(bytes);
+                        zipOutputStream.closeEntry();
                     }
                 } catch (Exception e) {
-                    log.warn("Skipping asset id={} url={} — fetch failed: {}",
-                            asset.getId(), asset.getSecureUrl(), e.getMessage());
+                    throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Failed to download asset: " + asset.getId(), e);
                 }
             }
         }
@@ -165,7 +130,7 @@ public class BatchController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header("Content-Disposition", "attachment; filename=\"" + jobId + ".zip\"")
-                .body(baos.toByteArray());
+            .body(zipArchiveBuffer.toByteArray());
     }
 
     private BatchJob requireJob(String jobId) {

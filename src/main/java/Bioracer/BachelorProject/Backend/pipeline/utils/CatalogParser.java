@@ -18,7 +18,7 @@ import java.util.List;
  * Parses a CSV catalog file (columns: product_id, garment_type, flat_lay_image_path,
  * garment_description) into a list of CatalogProduct objects.
  *
- * Note: the primary ingestion path is now the multipart/ZIP endpoint in BatchController.
+ * Note: the primary ingestion path is now the multipart asset generation endpoint in AssetGenerationController.
  * This parser is retained for CLI/scripted batch use.
  */
 @Component

@@ -1,7 +1,5 @@
 package Bioracer.BachelorProject.Backend.pipeline.adapters;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
@@ -11,8 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 public class FashnAdapter implements VTONAdapter {
-
-    private static final Logger log = LoggerFactory.getLogger(FashnAdapter.class);
 
     private static final String DEFAULT_PROMPT =
             "Fit the garment onto the model exactly as shown in the product image. " +
@@ -38,14 +34,20 @@ public class FashnAdapter implements VTONAdapter {
 
     @Override
     @SuppressWarnings("unchecked")
-    public byte[] generate(byte[] garmentImageBytes, byte[] personImageBytes, String category, String prompt) {
+    public byte[] generate(byte[] frontDesignBytes,
+                           byte[] backDesignBytes,
+                           byte[] personImageBytes,
+                           String category,
+                           String prompt) {
         String modelImage   = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
-        String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(garmentImageBytes);
+        String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(frontDesignBytes);
+        String backProductImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(backDesignBytes);
         String effectivePrompt = (prompt != null) ? prompt : DEFAULT_PROMPT;
 
         Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("model_image",      modelImage);
         inputs.put("product_image",    productImage);
+        inputs.put("back_garment_image", backProductImage);
         inputs.put("prompt",           effectivePrompt);
         inputs.put("resolution",       "1k");
         inputs.put("generation_mode",  "balanced");
@@ -65,7 +67,6 @@ public class FashnAdapter implements VTONAdapter {
                 .body(Map.class);
 
         String predictionId = (String) submitResponse.get("id");
-        log.info("Fashn.ai prediction submitted: {}", predictionId);
 
         // Step 2: poll until completed, failed, or timed out
         long deadline = System.currentTimeMillis() + timeoutSeconds * 1_000L;
@@ -83,12 +84,10 @@ public class FashnAdapter implements VTONAdapter {
                     .body(Map.class);
 
             String status = (String) statusResponse.get("status");
-            log.debug("Fashn.ai prediction {} status: {}", predictionId, status);
 
             if ("completed".equals(status)) {
                 List<String> outputs = (List<String>) statusResponse.get("output");
                 String imageUrl = outputs.get(0);
-                log.info("Fashn.ai prediction {} completed, downloading result from {}", predictionId, imageUrl);
                 return RestClient.create().get()
                         .uri(imageUrl)
                         .retrieve()

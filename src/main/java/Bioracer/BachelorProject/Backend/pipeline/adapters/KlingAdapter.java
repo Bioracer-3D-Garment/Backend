@@ -1,7 +1,5 @@
 package Bioracer.BachelorProject.Backend.pipeline.adapters;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -13,8 +11,6 @@ import org.springframework.web.client.RestClient;
  * Future work may split VTONAdapter into separate image/video interfaces.
  */
 public class KlingAdapter implements VTONAdapter {
-
-    private static final Logger log = LoggerFactory.getLogger(KlingAdapter.class);
 
     @SuppressWarnings("unused")
     private final RestClient client;
@@ -28,7 +24,11 @@ public class KlingAdapter implements VTONAdapter {
     }
 
     @Override
-    public byte[] generate(byte[] garmentImageBytes, byte[] personImageBytes, String category, String prompt) {
+    public byte[] generate(byte[] frontDesignBytes,
+                           byte[] backDesignBytes,
+                           byte[] personImageBytes,
+                           String category,
+                           String prompt) {
         // TODO: implement Kling AI video generation when the endpoint details are finalized.
         // Returns video file bytes (not image bytes) — see class-level note.
         throw new UnsupportedOperationException(
