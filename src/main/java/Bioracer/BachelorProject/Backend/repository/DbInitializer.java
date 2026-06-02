@@ -51,9 +51,11 @@ public class DbInitializer {
                                 new ArrayList<>(List.of("fashn-export-1778657803428_ebqsrs", "rood_weenmr")));
                 projectRepository.save(project);
 
-                Model gaelle = new Model("Gaelle", "gaelle_ojosrp", "front_jzff0a", "back_fpgjrc", "side_dxzgc8",
+                Model gaelle = new Model("Gaelle", "model_1_coverImage", "model_1_front", "model_1_back",
+                                "model_1_side",
                                 Gender.FEMALE);
-                Model patrick = new Model("Patrick", "patrick_nyx6ul", "front_xtza6y", "back_agkrap", "side_pygkga",
+                Model patrick = new Model("Patrick", "model_2_coverImage", "model_2_front", "model_2_back",
+                                "model_2_side",
                                 Gender.MALE);
                 modelRepository.save(gaelle);
                 modelRepository.save(patrick);
