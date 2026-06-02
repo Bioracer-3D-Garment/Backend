@@ -41,13 +41,13 @@ public class FashnAdapter implements VTONAdapter {
                            String prompt) {
         String modelImage   = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
         String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(frontDesignBytes);
-        String backProductImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(backDesignBytes);
         String effectivePrompt = (prompt != null) ? prompt : DEFAULT_PROMPT;
 
+        // tryon-max only accepts a single garment image (the front/product image).
+        // back_garment_image is NOT supported by this model and must not be sent.
         Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("model_image",      modelImage);
         inputs.put("product_image",    productImage);
-        inputs.put("back_garment_image", backProductImage);
         inputs.put("prompt",           effectivePrompt);
         inputs.put("resolution",       "1k");
         inputs.put("generation_mode",  "balanced");
