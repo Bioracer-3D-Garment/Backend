@@ -24,7 +24,8 @@ public class CloudinaryService {
                 "secure", true));
     }
 
-    public record UploadResult(String secureUrl, String publicId, String thumbnailUrl) {}
+    public record UploadResult(String secureUrl, String publicId, String thumbnailUrl) {
+    }
 
     public UploadResult upload(byte[] imageBytes, String publicId) {
         try {

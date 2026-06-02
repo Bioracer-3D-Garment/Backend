@@ -4,14 +4,15 @@ import Bioracer.BachelorProject.Backend.service.CloudinaryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.UUID;
 
 @RestController
+@RequestMapping("/cloudinary")
 public class UploadController {
 
     private final CloudinaryService cloudinaryService;
@@ -21,11 +22,12 @@ public class UploadController {
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
-    @PostMapping("/upload")
+    @PostMapping("/model/poses")
     public ResponseEntity<CloudinaryService.UploadResult> upload(
-            @RequestParam MultipartFile file) throws IOException {
+            @RequestParam MultipartFile file, @RequestParam String modelId, @RequestParam String pose)
+            throws IOException {
 
-        String publicId = "bioracer/uploads/" + UUID.randomUUID();
+        String publicId = "model_" + modelId + "_" + pose;
         CloudinaryService.UploadResult result = cloudinaryService.upload(file.getBytes(), publicId);
         return ResponseEntity.ok(result);
     }
