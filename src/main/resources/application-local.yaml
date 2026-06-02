@@ -16,11 +16,15 @@ spring:
         "[auto_quote_keyword]": true
         "[format_sql]": true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
   flyway:
     locations: classpath:db/migration
     enabled: true
-    baseline-on-migrate: false
+    baseline-on-migrate: true
+    baseline-version: 0
+    schemas:
+      - bioracer
+    create-schemas: true
 springdoc:
   server-url: ${API_URL}
 
@@ -34,7 +38,7 @@ jwt:
 
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key:    ${CLOUDINARY_API_KEY}
+  api-key: ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
 
 vton:
