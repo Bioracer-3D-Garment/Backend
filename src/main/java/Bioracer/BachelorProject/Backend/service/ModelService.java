@@ -47,8 +47,8 @@ public class ModelService {
         if (modelRepository.existsByName(modelInput.name())) {
             throw new ModelException("Model with name: " + modelInput.name() + " already exists.");
         }
-        return modelRepository.save(new Model(modelInput.name(), modelInput.front(), modelInput.back(),
-                modelInput.side(), modelInput.gender()));
+        return modelRepository.save(new Model(modelInput.name(), modelInput.coverImage(), modelInput.front(),
+                modelInput.back(), modelInput.side(), modelInput.gender()));
     }
 
     public Model updateModelDetails(ModelInput modelInput, long id) {
