@@ -2,10 +2,10 @@ package Bioracer.BachelorProject.Backend.pipeline.services;
 
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.VTONAdapter;
-import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
-import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
+import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
+import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.models.FailedItem;
-import Bioracer.BachelorProject.Backend.pipeline.repository.BatchJobRepository;
+import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
 import Bioracer.BachelorProject.Backend.service.CloudinaryService;
@@ -35,13 +35,13 @@ import java.util.stream.Stream;
 // Java 21 virtual threads required: Executors.newVirtualThreadPerTaskExecutor() is used for
 // parallel combination processing. Downgrading to an earlier JVM will break this class.
 @Service
-public class BatchService {
+public class AssetGenerationService {
 
     private static final int maxRetries = 3;
     private static final long retryWaitMs = 2000;
     private static final List<String> positions = List.of("front", "back", "side");
     private final VTONAdapter adapter;
-    private final BatchJobRepository jobRepository;
+    private final AssetGenerationJobRepository jobRepository;
     private final CloudinaryService cloudinaryService;
     private final GeneratedAssetRepository generatedAssetRepository;
     private final ProjectRepository projectRepository;
@@ -49,8 +49,8 @@ public class BatchService {
     @Value("${pipeline.poses-dir}")
     private String posesDir;
 
-    public BatchService(VTONAdapter adapter,
-                        BatchJobRepository jobRepository,
+    public AssetGenerationService(VTONAdapter adapter,
+                        AssetGenerationJobRepository jobRepository,
                         CloudinaryService cloudinaryService,
                         GeneratedAssetRepository generatedAssetRepository,
                         ProjectRepository projectRepository) {
@@ -61,27 +61,27 @@ public class BatchService {
         this.projectRepository = projectRepository;
     }
 
-    public BatchJob createJob(int totalCount, Long folderId) {
+    public AssetGenerationJob createJob(int totalCount, Long folderId) {
         if (!projectRepository.existsById(folderId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Project not found: " + folderId);
         }
         String jobId = UUID.randomUUID().toString();
         String runId = "run_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        return jobRepository.save(new BatchJob(jobId, runId, null, totalCount, folderId));
+        return jobRepository.save(new AssetGenerationJob(jobId, runId, null, totalCount, folderId));
     }
 
-    public BatchJob submitBatch(MultipartFile frontDesign,
-                                MultipartFile backDesign,
-                                Long modelId,
-                                Long folderId) throws IOException {
+    public AssetGenerationJob submitAssetGeneration(MultipartFile frontDesign,
+                                                    MultipartFile backDesign,
+                                                    Long modelId,
+                                                    Long folderId) throws IOException {
 
         String productId = resolveProductId(frontDesign.getOriginalFilename());
         byte[] frontDesignBytes = frontDesign.getBytes();
         byte[] backDesignBytes = backDesign.getBytes();
 
-        BatchJob job = createJob(positions.size(), folderId);
-        runBatch(job.getJobId(), productId, frontDesignBytes, backDesignBytes, modelId);
+        AssetGenerationJob job = createJob(positions.size(), folderId);
+        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, modelId);
         return job;
     }
 
@@ -107,39 +107,39 @@ public class BatchService {
     }
 
     @Async
-    public void runBatch(String jobId,
-                         String productId,
-                         byte[] frontDesignBytes,
-                         byte[] backDesignBytes,
-                         Long modelId) {
-        BatchJob job = jobRepository.findById(jobId)
+    public void runAssetGeneration(String jobId,
+                                   String productId,
+                                   byte[] frontDesignBytes,
+                                   byte[] backDesignBytes,
+                                   Long modelId) {
+        AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
         try {
-            job.setStatus(BatchStatus.RUNNING);
+            job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
             List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, modelId);
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
-                job.setStatus(BatchStatus.DONE);
+                job.setStatus(AssetGenerationStatus.DONE);
             } else if (job.getUploadedCount() > 0) {
-                job.setStatus(BatchStatus.PARTIAL);
+                job.setStatus(AssetGenerationStatus.PARTIAL);
             } else {
-                job.setStatus(BatchStatus.FAILED);
+                job.setStatus(AssetGenerationStatus.FAILED);
             }
             jobRepository.save(job);
 
         } catch (Exception e) {
             fail(job, e.getMessage());
-            throw new IllegalStateException("Batch job failed: " + jobId, e);
+            throw new IllegalStateException("Asset generation job failed: " + jobId, e);
         }
     }
 
     // ---- private helpers ----
 
-    private List<FailedItem> processAllCombinations(BatchJob job,
+    private List<FailedItem> processAllCombinations(AssetGenerationJob job,
                                                      String productId,
                                                      byte[] frontDesignBytes,
                                                      byte[] backDesignBytes,
@@ -176,7 +176,7 @@ public class BatchService {
                                                   byte[] backDesignBytes,
                                                   String pose,
                                                   Long modelId,
-                                                  BatchJob job) {
+                                                  AssetGenerationJob job) {
         Path poseFile;
         try {
             poseFile = resolvePoseFileForpose(modelId, pose);
@@ -249,18 +249,18 @@ public class BatchService {
     }
 
     // completed increments on both success and failure so the progress bar reaches 100 %
-    private synchronized void recordCompleted(BatchJob job) {
+    private synchronized void recordCompleted(AssetGenerationJob job) {
         job.setCompletedCount(job.getCompletedCount() + 1);
         jobRepository.save(job);
     }
 
-    private synchronized void recordUploaded(BatchJob job) {
+    private synchronized void recordUploaded(AssetGenerationJob job) {
         job.setUploadedCount(job.getUploadedCount() + 1);
         jobRepository.save(job);
     }
 
-    private void fail(BatchJob job, String message) {
-        job.setStatus(BatchStatus.FAILED);
+    private void fail(AssetGenerationJob job, String message) {
+        job.setStatus(AssetGenerationStatus.FAILED);
         job.setErrorMessage(message);
         jobRepository.save(job);
     }

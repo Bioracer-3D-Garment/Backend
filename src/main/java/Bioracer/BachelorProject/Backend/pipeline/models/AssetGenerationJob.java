@@ -14,7 +14,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "batch_job")
-public class BatchJob {
+public class AssetGenerationJob {
 
     @Id
     private String jobId;
@@ -22,7 +22,7 @@ public class BatchJob {
     private String runId;
 
     @Enumerated(EnumType.STRING)
-    private BatchStatus status;
+    private AssetGenerationStatus status;
 
     private int totalCount;
 
@@ -44,15 +44,15 @@ public class BatchJob {
     @Column(columnDefinition = "TEXT")
     private List<FailedItem> failedItems = new ArrayList<>();
 
-    protected BatchJob() {}
+    protected AssetGenerationJob() {}
 
-    public BatchJob(String jobId, String runId, String outputPath, int totalCount, Long folderId) {
+    public AssetGenerationJob(String jobId, String runId, String outputPath, int totalCount, Long folderId) {
         this.jobId = jobId;
         this.runId = runId;
         this.outputPath = outputPath;
         this.totalCount = totalCount;
         this.folderId = folderId;
-        this.status = BatchStatus.PENDING;
+        this.status = AssetGenerationStatus.PENDING;
         this.completedCount = 0;
         this.createdAt = LocalDateTime.now();
         this.failedItems = new ArrayList<>();
@@ -62,8 +62,8 @@ public class BatchJob {
 
     public String getRunId() { return runId; }
 
-    public BatchStatus getStatus() { return status; }
-    public void setStatus(BatchStatus status) { this.status = status; }
+    public AssetGenerationStatus getStatus() { return status; }
+    public void setStatus(AssetGenerationStatus status) { this.status = status; }
 
     public int getTotalCount() { return totalCount; }
 

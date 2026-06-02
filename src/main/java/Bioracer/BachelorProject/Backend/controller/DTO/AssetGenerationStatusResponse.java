@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-public record BatchStatusResponse(
+public record AssetGenerationStatusResponse(
         String jobId,
         @Schema(allowableValues = {"PENDING", "RUNNING", "DONE", "PARTIAL", "FAILED"})
         String status,

@@ -1,6 +1,6 @@
 package Bioracer.BachelorProject.Backend.controller;
 
-import Bioracer.BachelorProject.Backend.pipeline.services.BatchService;
+import Bioracer.BachelorProject.Backend.pipeline.services.AssetGenerationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -74,7 +74,7 @@ public class PoseController {
         try (Stream<Path> stream = Files.walk(poseDir)) {
             imageFile = stream
                     .filter(Files::isRegularFile)
-                    .filter(p -> BatchService.isImageFile(p.getFileName().toString()))
+                    .filter(p -> AssetGenerationService.isImageFile(p.getFileName().toString()))
                     .findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "No image found for pose: " + id));

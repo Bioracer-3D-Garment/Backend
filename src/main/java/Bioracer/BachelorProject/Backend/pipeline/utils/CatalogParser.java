@@ -19,7 +19,7 @@ import java.util.List;
  * garment_description) into a list of CatalogProduct objects.
  *
  * Note: the primary ingestion path is now the multipart asset generation endpoint in AssetGenerationController.
- * This parser is retained for CLI/scripted batch use.
+ * This parser is retained for CLI/scripted asset-generation use.
  */
 @Component
 public class CatalogParser {

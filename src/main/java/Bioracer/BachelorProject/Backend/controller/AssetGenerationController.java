@@ -1,13 +1,13 @@
 package Bioracer.BachelorProject.Backend.controller;
 
-import Bioracer.BachelorProject.Backend.controller.DTO.BatchStatusResponse;
+import Bioracer.BachelorProject.Backend.controller.DTO.AssetGenerationStatusResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.GeneratedAssetResponse;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
-import Bioracer.BachelorProject.Backend.pipeline.models.BatchJob;
-import Bioracer.BachelorProject.Backend.pipeline.models.BatchStatus;
-import Bioracer.BachelorProject.Backend.pipeline.repository.BatchJobRepository;
-import Bioracer.BachelorProject.Backend.pipeline.services.BatchService;
+import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
+import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
+import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
+import Bioracer.BachelorProject.Backend.pipeline.services.AssetGenerationService;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 
 import org.springframework.http.HttpStatus;
@@ -29,14 +29,14 @@ import java.util.zip.ZipOutputStream;
 @RestController
 @RequestMapping("/batches")
 public class AssetGenerationController {
-    private final BatchService batchService;
-    private final BatchJobRepository jobRepository;
+    private final AssetGenerationService assetGenerationService;
+    private final AssetGenerationJobRepository jobRepository;
     private final GeneratedAssetRepository generatedAssetRepository;
 
-    public AssetGenerationController(BatchService batchService,
-                                     BatchJobRepository jobRepository,
-                                     GeneratedAssetRepository generatedAssetRepository, Bioracer.BachelorProject.Backend.controller.ExceptionHandlers exceptionHandlers) {
-        this.batchService = batchService;
+    public AssetGenerationController(AssetGenerationService assetGenerationService,
+                                     AssetGenerationJobRepository jobRepository,
+                                     GeneratedAssetRepository generatedAssetRepository) {
+        this.assetGenerationService = assetGenerationService;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
     }
@@ -57,9 +57,9 @@ public class AssetGenerationController {
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
             @RequestParam("folderId") Long folderId) {
-        BatchJob job;
+        AssetGenerationJob job;
         try {
-            job = batchService.submitBatch(frontDesign, backDesign, modelId, folderId);
+            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);
@@ -72,18 +72,18 @@ public class AssetGenerationController {
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/status")
-    public ResponseEntity<BatchStatusResponse> getStatus(@PathVariable String jobId) {
-        BatchJob job = requireJob(jobId);
+    public ResponseEntity<AssetGenerationStatusResponse> getStatus(@PathVariable String jobId) {
+        AssetGenerationJob job = requireJob(jobId);
 
         List<GeneratedAssetResponse> assets = null;
-        BatchStatus status = job.getStatus();
-        if (status == BatchStatus.DONE || status == BatchStatus.PARTIAL) {
+        AssetGenerationStatus status = job.getStatus();
+        if (status == AssetGenerationStatus.DONE || status == AssetGenerationStatus.PARTIAL) {
             assets = generatedAssetRepository.findByJobId(jobId).stream()
                     .map(GeneratedAssetResponse::from)
                     .toList();
         }
 
-        return ResponseEntity.ok(new BatchStatusResponse(
+        return ResponseEntity.ok(new AssetGenerationStatusResponse(
                 job.getJobId(),
                 job.getStatus().name(),
                 job.getCompletedCount(),
@@ -96,9 +96,9 @@ public class AssetGenerationController {
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/{jobId}/download")
     public ResponseEntity<?> downloadJob(@PathVariable String jobId) throws IOException {
-        BatchJob job = requireJob(jobId);
+        AssetGenerationJob job = requireJob(jobId);
 
-        if (job.getStatus() != BatchStatus.DONE && job.getStatus() != BatchStatus.PARTIAL) {
+        if (job.getStatus() != AssetGenerationStatus.DONE && job.getStatus() != AssetGenerationStatus.PARTIAL) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(409, "Conflict", "Job not finished yet"));
         }
@@ -133,9 +133,9 @@ public class AssetGenerationController {
             .body(zipArchiveBuffer.toByteArray());
     }
 
-    private BatchJob requireJob(String jobId) {
+    private AssetGenerationJob requireJob(String jobId) {
         return jobRepository.findById(jobId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Batch job not found: " + jobId));
+                        "Asset generation job not found: " + jobId));
     }
 }

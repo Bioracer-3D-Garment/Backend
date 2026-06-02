@@ -1,5 +1,5 @@
 package Bioracer.BachelorProject.Backend.pipeline.models;
 
-public enum BatchStatus {
+public enum AssetGenerationStatus {
     PENDING, RUNNING, DONE, PARTIAL, FAILED
 }
