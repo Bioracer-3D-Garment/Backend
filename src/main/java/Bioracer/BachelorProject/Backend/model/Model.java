@@ -106,4 +106,62 @@ public class Model {
         this.coverImage = coverImage;
     }
 
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((coverImage == null) ? 0 : coverImage.hashCode());
+        result = prime * result + ((id == null) ? 0 : id.hashCode());
+        result = prime * result + ((name == null) ? 0 : name.hashCode());
+        result = prime * result + ((front == null) ? 0 : front.hashCode());
+        result = prime * result + ((back == null) ? 0 : back.hashCode());
+        result = prime * result + ((side == null) ? 0 : side.hashCode());
+        result = prime * result + ((gender == null) ? 0 : gender.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Model other = (Model) obj;
+        if (coverImage == null) {
+            if (other.coverImage != null)
+                return false;
+        } else if (!coverImage.equals(other.coverImage))
+            return false;
+        if (id == null) {
+            if (other.id != null)
+                return false;
+        } else if (!id.equals(other.id))
+            return false;
+        if (name == null) {
+            if (other.name != null)
+                return false;
+        } else if (!name.equals(other.name))
+            return false;
+        if (front == null) {
+            if (other.front != null)
+                return false;
+        } else if (!front.equals(other.front))
+            return false;
+        if (back == null) {
+            if (other.back != null)
+                return false;
+        } else if (!back.equals(other.back))
+            return false;
+        if (side == null) {
+            if (other.side != null)
+                return false;
+        } else if (!side.equals(other.side))
+            return false;
+        if (gender != other.gender)
+            return false;
+        return true;
+    }
+
 }
