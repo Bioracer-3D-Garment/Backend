@@ -4,6 +4,7 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
@@ -37,6 +38,29 @@ public class CloudinaryService {
             return new UploadResult(secureUrl, returnedPublicId, thumbnailUrl);
         } catch (Exception e) {
             throw new RuntimeException("Cloudinary upload failed for publicId=" + publicId, e);
+        }
+    }
+
+    /**
+     * Resolves a Cloudinary public ID to its secure delivery URL and downloads the image bytes.
+     * Used by the generation pipeline to fetch a model's pose images.
+     */
+    public byte[] download(String publicId) {
+        if (publicId == null || publicId.isBlank()) {
+            throw new IllegalArgumentException("Cannot download Cloudinary image: publicId is blank");
+        }
+        try {
+            String url = cloudinary.url().secure(true).generate(publicId);
+            byte[] bytes = RestClient.create().get()
+                    .uri(url)
+                    .retrieve()
+                    .body(byte[].class);
+            if (bytes == null || bytes.length == 0) {
+                throw new IllegalStateException("Cloudinary returned empty body for publicId=" + publicId);
+            }
+            return bytes;
+        } catch (Exception e) {
+            throw new RuntimeException("Cloudinary download failed for publicId=" + publicId, e);
         }
     }
 

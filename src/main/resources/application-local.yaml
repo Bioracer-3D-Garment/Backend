@@ -28,12 +28,9 @@ cors:
 jwt:
   secret-key: ${JWT_SECRET_KEY}
 
-pipeline:
-  poses-dir: "C:/Users/DJRONNY/Documents/GitHub/Bioracer-3D-Garment/Backend/src/main/resources/poses"
-
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
+  api-key:    ${CLOUDINARY_API_KEY}
   api-secret: ${CLOUDINARY_API_SECRET}
 
 vton:

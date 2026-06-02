@@ -1,15 +1,16 @@
 package Bioracer.BachelorProject.Backend.pipeline.services;
 
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
+import Bioracer.BachelorProject.Backend.model.Model;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.VTONAdapter;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.models.FailedItem;
 import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
+import Bioracer.BachelorProject.Backend.repository.ModelRepository;
 import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
 import Bioracer.BachelorProject.Backend.service.CloudinaryService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -17,20 +18,18 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.Stream;
 
 // Java 21 virtual threads required: Executors.newVirtualThreadPerTaskExecutor() is used for
 // parallel combination processing. Downgrading to an earlier JVM will break this class.
@@ -45,20 +44,20 @@ public class AssetGenerationService {
     private final CloudinaryService cloudinaryService;
     private final GeneratedAssetRepository generatedAssetRepository;
     private final ProjectRepository projectRepository;
-
-    @Value("${pipeline.poses-dir}")
-    private String posesDir;
+    private final ModelRepository modelRepository;
 
     public AssetGenerationService(VTONAdapter adapter,
                         AssetGenerationJobRepository jobRepository,
                         CloudinaryService cloudinaryService,
                         GeneratedAssetRepository generatedAssetRepository,
-                        ProjectRepository projectRepository) {
+                        ProjectRepository projectRepository,
+                        ModelRepository modelRepository) {
         this.adapter = adapter;
         this.jobRepository = jobRepository;
         this.cloudinaryService = cloudinaryService;
         this.generatedAssetRepository = generatedAssetRepository;
         this.projectRepository = projectRepository;
+        this.modelRepository = modelRepository;
     }
 
     public AssetGenerationJob createJob(int totalCount, Long folderId) {
@@ -76,34 +75,33 @@ public class AssetGenerationService {
                                                     Long modelId,
                                                     Long folderId) throws IOException {
 
+        // Resolve the model's pose images (Cloudinary public IDs) up front so a bad model
+        // fails fast before the async job is created.
+        Map<String, String> poseImageIds = resolvePoseImageIds(modelId);
+
         String productId = resolveProductId(frontDesign.getOriginalFilename());
         byte[] frontDesignBytes = frontDesign.getBytes();
         byte[] backDesignBytes = backDesign.getBytes();
 
         AssetGenerationJob job = createJob(positions.size(), folderId);
-        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, modelId);
+        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, poseImageIds);
         return job;
     }
 
     /**
-     * Returns the single pose image for the given modelId and pose.
-     * Throws IllegalStateException if the directory is missing or contains no images.
+     * Returns the Cloudinary public ID of each pose image (front/back/side) for the given model.
+     * Throws 404 if the model does not exist.
      */
-    public Path resolvePoseFileForpose(Long modelId, String pose) {
-        Path dir = Paths.get(posesDir, modelId.toString(), pose);
-        if (!Files.isDirectory(dir)) {
-            throw new IllegalStateException(
-                    "No pose directory for modelId='" + modelId + "' Position='" + pose + "': " + dir);
-        }
-        try (Stream<Path> stream = Files.list(dir)) {
-            return stream
-                    .filter(p -> isImageFile(p.getFileName().toString()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException(
-                            "No pose image found in " + dir));
-        } catch (IOException e) {
-            throw new IllegalStateException("Error reading pose directory: " + dir, e);
-        }
+    private Map<String, String> resolvePoseImageIds(Long modelId) {
+        Model model = modelRepository.findById(modelId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Model not found: " + modelId));
+
+        Map<String, String> poseImageIds = new LinkedHashMap<>();
+        poseImageIds.put("front", model.getFront());
+        poseImageIds.put("back", model.getBack());
+        poseImageIds.put("side", model.getSide());
+        return poseImageIds;
     }
 
     @Async
@@ -111,7 +109,7 @@ public class AssetGenerationService {
                                    String productId,
                                    byte[] frontDesignBytes,
                                    byte[] backDesignBytes,
-                                   Long modelId) {
+                                   Map<String, String> poseImageIds) {
         AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -119,7 +117,7 @@ public class AssetGenerationService {
             job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
-            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, modelId);
+            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, poseImageIds);
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
@@ -143,15 +141,16 @@ public class AssetGenerationService {
                                                      String productId,
                                                      byte[] frontDesignBytes,
                                                      byte[] backDesignBytes,
-                                                     Long modelId) {
+                                                     Map<String, String> poseImageIds) {
         List<FailedItem> failedItems = new CopyOnWriteArrayList<>();
         List<Future<?>> futures = new ArrayList<>();
 
         // Virtual threads: one per garment×pose combination for maximum I/O concurrency
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (String pose : positions) {
+                String posePublicId = poseImageIds.get(pose);
                 futures.add(executor.submit(() -> {
-                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, modelId, job);
+                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, posePublicId, job);
                     failure.ifPresent(reason ->
                             failedItems.add(new FailedItem(productId, pose, reason)));
                     recordCompleted(job);
@@ -175,13 +174,17 @@ public class AssetGenerationService {
                                                   byte[] frontDesignBytes,
                                                   byte[] backDesignBytes,
                                                   String pose,
-                                                  Long modelId,
+                                                  String posePublicId,
                                                   AssetGenerationJob job) {
-        Path poseFile;
+        if (posePublicId == null || posePublicId.isBlank()) {
+            return Optional.of("Model has no '" + pose + "' pose image");
+        }
+
+        byte[] poseBytes;
         try {
-            poseFile = resolvePoseFileForpose(modelId, pose);
-        } catch (IllegalStateException e) {
-            return Optional.of("Pose directory missing: " + e.getMessage());
+            poseBytes = cloudinaryService.download(posePublicId);
+        } catch (Exception e) {
+            return Optional.of("Failed to download pose '" + pose + "' (" + posePublicId + "): " + e.getMessage());
         }
 
         String cloudinaryPublicId = "bioracer/" + job.getFolderId()
@@ -190,7 +193,6 @@ public class AssetGenerationService {
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                byte[] poseBytes = Files.readAllBytes(poseFile);
                 byte[] result = adapter.generate(frontDesignBytes, backDesignBytes, poseBytes, null, null);
 
                 CloudinaryService.UploadResult uploadResult =
@@ -240,12 +242,6 @@ public class AssetGenerationService {
 
         int extensionIndex = fileName.lastIndexOf('.');
         return extensionIndex > 0 ? fileName.substring(0, extensionIndex) : fileName;
-    }
-
-    public static boolean isImageFile(String name) {
-        String lower = name.toLowerCase();
-        return lower.endsWith(".jpg") || lower.endsWith(".jpeg")
-                || lower.endsWith(".png") || lower.endsWith(".webp");
     }
 
     // completed increments on both success and failure so the progress bar reaches 100 %
