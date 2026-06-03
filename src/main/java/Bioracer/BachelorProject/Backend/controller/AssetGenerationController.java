@@ -54,12 +54,12 @@ public class AssetGenerationController {
      */
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> submitBatch(
+    public ResponseEntity<?> submitBatch(
             @RequestParam("frontDesign") MultipartFile frontDesign,
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
             @RequestParam("folderId") Long folderId,
-            @RequestBody(required = true) AdvancedSettings advancedSettings
+            @RequestPart("advancedSettings") AdvancedSettings advancedSettings
         ) {
         AssetGenerationJob job;
         try {
@@ -67,11 +67,9 @@ public class AssetGenerationController {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);
-        } catch (Exception e) {
-            throw e;
         }
 
-        return ResponseEntity.accepted().body("Job has been accepted: " + job.getJobId());
+        return ResponseEntity.accepted().body(java.util.Map.of("jobId", job.getJobId()));
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
