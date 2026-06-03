@@ -17,14 +17,6 @@ spring:
         "[format_sql]": true
     hibernate:
       ddl-auto: create-drop
-  flyway:
-    locations: classpath:db/migration
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
-    schemas:
-      - bioracer
-    create-schemas: true
 springdoc:
   server-url: ${API_URL}
 

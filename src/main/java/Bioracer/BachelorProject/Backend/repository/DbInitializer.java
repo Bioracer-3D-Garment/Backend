@@ -3,6 +3,7 @@ package Bioracer.BachelorProject.Backend.repository;
 import org.springframework.stereotype.Component;
 
 import Bioracer.BachelorProject.Backend.model.Gender;
+import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.model.Model;
 import Bioracer.BachelorProject.Backend.model.Project;
 import Bioracer.BachelorProject.Backend.model.Role;
@@ -22,13 +23,16 @@ public class DbInitializer {
         private ProjectRepository projectRepository;
         private PasswordEncoder passwordEncoder;
         private ModelRepository modelRepository;
+        private GeneratedAssetRepository assetRepository;
 
         public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository,
-                        PasswordEncoder passwordEncoder, ModelRepository modelRepository) {
+                        PasswordEncoder passwordEncoder, ModelRepository modelRepository,
+                        GeneratedAssetRepository assetRepository) {
                 this.userRepository = userRepository;
                 this.projectRepository = projectRepository;
                 this.passwordEncoder = passwordEncoder;
                 this.modelRepository = modelRepository;
+                this.assetRepository = assetRepository;
         }
 
         public void ClearAll() {
@@ -47,15 +51,18 @@ public class DbInitializer {
                 userRepository.save(admin);
 
                 Project project = new Project("Test Project", admin,
-                                "fashn-export-1778657803428_ebqsrs",
-                                new ArrayList<>(List.of("fashn-export-1778657803428_ebqsrs", "rood_weenmr")));
+                                "Stella_Artois_logo.svg.png");
                 projectRepository.save(project);
 
-                Model gaelle = new Model("Gaelle", "model_1_coverImage", "model_1_front", "model_1_back",
-                                "model_1_side",
+                GeneratedAsset asset1 = new GeneratedAsset(project, "http://localhost:8080/model_1_front.png",
+                                "http://localhost:8080/model_1_front.png", "model_1_front.png");
+                assetRepository.save(asset1);
+
+                Model gaelle = new Model("Gaelle", "model_1_coverImage.png", "model_1_front.png", "model_1_back.png",
+                                "model_1_side.png",
                                 Gender.FEMALE);
-                Model patrick = new Model("Patrick", "model_2_coverImage", "model_2_front", "model_2_back",
-                                "model_2_side",
+                Model patrick = new Model("Patrick", "model_2_coverImage.png", "model_2_front.png", "model_2_back.png",
+                                "model_2_side.png",
                                 Gender.MALE);
                 modelRepository.save(gaelle);
                 modelRepository.save(patrick);

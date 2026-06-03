@@ -7,9 +7,6 @@ spring:
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      data-source-properties:
-        currentSchema: bioracer
   jpa:
     show-sql: true
     open-in-view: true
@@ -20,15 +17,6 @@ spring:
         "[format_sql]": true
     hibernate:
       ddl-auto: ${DDL_AUTO:validate}
-  flyway:
-    locations: classpath:db/migration
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
-    schemas:
-      - bioracer
-    default-schema: bioracer
-    create-schemas: true
 
 springdoc:
   server-url: ${API_URL}
