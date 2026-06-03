@@ -3,6 +3,7 @@ package Bioracer.BachelorProject.Backend.pipeline.services;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
 import Bioracer.BachelorProject.Backend.model.Model;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.VTONAdapter;
+import Bioracer.BachelorProject.Backend.pipeline.models.AdvancedSettings;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.models.FailedItem;
@@ -73,7 +74,8 @@ public class AssetGenerationService {
     public AssetGenerationJob submitAssetGeneration(MultipartFile frontDesign,
                                                     MultipartFile backDesign,
                                                     Long modelId,
-                                                    Long folderId) throws IOException {
+                                                    Long folderId,
+                                                    AdvancedSettings advancedSettings) throws IOException {
 
         // Resolve the model's pose images (Cloudinary public IDs) up front so a bad model
         // fails fast before the async job is created.
@@ -84,7 +86,7 @@ public class AssetGenerationService {
         byte[] backDesignBytes = backDesign.getBytes();
 
         AssetGenerationJob job = createJob(positions.size(), folderId);
-        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, poseImageIds);
+        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, poseImageIds, advancedSettings);
         return job;
     }
 
@@ -109,7 +111,8 @@ public class AssetGenerationService {
                                    String productId,
                                    byte[] frontDesignBytes,
                                    byte[] backDesignBytes,
-                                   Map<String, String> poseImageIds) {
+                                   Map<String, String> poseImageIds,
+                                   AdvancedSettings advancedSettings) {
         AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -117,7 +120,7 @@ public class AssetGenerationService {
             job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
-            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, poseImageIds);
+            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, poseImageIds, advancedSettings);
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
@@ -141,7 +144,8 @@ public class AssetGenerationService {
                                                      String productId,
                                                      byte[] frontDesignBytes,
                                                      byte[] backDesignBytes,
-                                                     Map<String, String> poseImageIds) {
+                                                     Map<String, String> poseImageIds,
+                                                     AdvancedSettings advancedSettings) {
         List<FailedItem> failedItems = new CopyOnWriteArrayList<>();
         List<Future<?>> futures = new ArrayList<>();
 
@@ -150,7 +154,7 @@ public class AssetGenerationService {
             for (String pose : positions) {
                 String posePublicId = poseImageIds.get(pose);
                 futures.add(executor.submit(() -> {
-                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, posePublicId, job);
+                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, posePublicId, job, advancedSettings);
                     failure.ifPresent(reason ->
                             failedItems.add(new FailedItem(productId, pose, reason)));
                     recordCompleted(job);
@@ -175,7 +179,8 @@ public class AssetGenerationService {
                                                   byte[] backDesignBytes,
                                                   String pose,
                                                   String posePublicId,
-                                                  AssetGenerationJob job) {
+                                                  AssetGenerationJob job,
+                                                  AdvancedSettings advancedSettings) {
         if (posePublicId == null || posePublicId.isBlank()) {
             return Optional.of("Model has no '" + pose + "' pose image");
         }
@@ -193,7 +198,7 @@ public class AssetGenerationService {
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                byte[] result = adapter.generate(frontDesignBytes, backDesignBytes, poseBytes, null, null);
+                byte[] result = adapter.generate(frontDesignBytes, backDesignBytes, poseBytes, lastError, advancedSettings);
 
                 CloudinaryService.UploadResult uploadResult =
                         cloudinaryService.upload(result, cloudinaryPublicId);
