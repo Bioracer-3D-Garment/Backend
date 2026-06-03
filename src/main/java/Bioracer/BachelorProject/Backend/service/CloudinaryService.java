@@ -42,6 +42,25 @@ public class CloudinaryService {
     }
 
     /**
+     * Uploads a generated video (e.g. an MP4 from the Kling pipeline) under the given public ID.
+     * Unlike {@link #upload}, this uses {@code resource_type=video} and derives a poster-frame
+     * thumbnail (first frame, scaled) for previews.
+     */
+    public UploadResult uploadVideo(byte[] videoBytes, String publicId) {
+        try {
+            Map<?, ?> result = cloudinary.uploader().upload(videoBytes, ObjectUtils.asMap(
+                    "public_id", publicId,
+                    "resource_type", "video"));
+            String secureUrl = (String) result.get("secure_url");
+            String returnedPublicId = (String) result.get("public_id");
+            String thumbnailUrl = deriveVideoThumbnailUrl(secureUrl);
+            return new UploadResult(secureUrl, returnedPublicId, thumbnailUrl);
+        } catch (Exception e) {
+            throw new RuntimeException("Cloudinary video upload failed for publicId=" + publicId, e);
+        }
+    }
+
+    /**
      * Resolves a Cloudinary public ID to its secure delivery URL and downloads the image bytes.
      * Used by the generation pipeline to fetch a model's pose images.
      */
@@ -77,5 +96,18 @@ public class CloudinaryService {
             throw new IllegalArgumentException("Cloudinary URL missing /upload/ segment: " + secureUrl);
         }
         return secureUrl.replace("/upload/", "/upload/w_400,h_400,c_fit/");
+    }
+
+    /**
+     * Derives a poster-frame thumbnail (JPG) from a Cloudinary video delivery URL by scaling the
+     * first frame and swapping the video extension for {@code .jpg}.
+     */
+    private String deriveVideoThumbnailUrl(String secureUrl) {
+        if (!secureUrl.contains("/upload/")) {
+            throw new IllegalArgumentException("Cloudinary URL missing /upload/ segment: " + secureUrl);
+        }
+        String scaled = secureUrl.replace("/upload/", "/upload/so_0,w_400,h_400,c_fit/");
+        int lastDot = scaled.lastIndexOf('.');
+        return (lastDot > scaled.lastIndexOf('/')) ? scaled.substring(0, lastDot) + ".jpg" : scaled + ".jpg";
     }
 }
