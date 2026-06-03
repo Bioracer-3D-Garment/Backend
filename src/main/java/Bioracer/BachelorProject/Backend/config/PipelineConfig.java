@@ -1,7 +1,6 @@
 package Bioracer.BachelorProject.Backend.config;
 
 import Bioracer.BachelorProject.Backend.pipeline.adapters.FashnAdapter;
-import Bioracer.BachelorProject.Backend.pipeline.adapters.KlingAdapter;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.VTONAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -20,11 +19,6 @@ public class PipelineConfig {
             @Value("${fashn.timeout-seconds:120}") long fashnTimeoutSeconds,
             @Value("${kling.api.key:}") String klingApiKey) {
 
-        return switch (adapterName) {
-            case "fashn" -> new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
-            case "kling" -> new KlingAdapter(klingApiKey);
-            default -> throw new IllegalArgumentException("Unknown vton.adapter value: '" + adapterName +
-                    "'. Supported values: fashn, kling");
-        };
+        return new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
     }
 }

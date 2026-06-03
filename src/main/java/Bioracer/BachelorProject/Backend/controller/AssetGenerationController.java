@@ -4,6 +4,7 @@ import Bioracer.BachelorProject.Backend.controller.DTO.AssetGenerationStatusResp
 import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.GeneratedAssetResponse;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
+import Bioracer.BachelorProject.Backend.pipeline.models.AdvancedSettings;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
@@ -35,10 +36,11 @@ public class AssetGenerationController {
 
     public AssetGenerationController(AssetGenerationService assetGenerationService,
                                      AssetGenerationJobRepository jobRepository,
-                                     GeneratedAssetRepository generatedAssetRepository) {
+                                     GeneratedAssetRepository generatedAssetRepository, Bioracer.BachelorProject.Backend.controller.AssetController assetController, Bioracer.BachelorProject.Backend.service.AssetService assetService) {
         this.assetGenerationService = assetGenerationService;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
+
     }
 
     /**
@@ -56,10 +58,12 @@ public class AssetGenerationController {
             @RequestParam("frontDesign") MultipartFile frontDesign,
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
-            @RequestParam("folderId") Long folderId) {
+            @RequestParam("folderId") Long folderId,
+            @RequestBody(required = true) AdvancedSettings advancedSettings
+        ) {
         AssetGenerationJob job;
         try {
-            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId);
+            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId, advancedSettings);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);
