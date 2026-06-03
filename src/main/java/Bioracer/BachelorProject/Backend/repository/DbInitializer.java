@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Component
+@Profile("local")
 public class DbInitializer {
         private UserRepository userRepository;
         private ProjectRepository projectRepository;
