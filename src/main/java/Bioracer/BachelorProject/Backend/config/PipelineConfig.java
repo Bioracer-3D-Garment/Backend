@@ -1,5 +1,6 @@
 package Bioracer.BachelorProject.Backend.config;
 
+import Bioracer.BachelorProject.Backend.pipeline.adapters.FalKlingVideoClient;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.FashnAdapter;
 import Bioracer.BachelorProject.Backend.pipeline.adapters.VTONAdapter;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,5 +21,21 @@ public class PipelineConfig {
             @Value("${kling.api.key:}") String klingApiKey) {
 
         return new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
+    }
+
+    /**
+     * Client for fal.ai's Kling v3 Pro image-to-video model. Independent of {@code vton.adapter}:
+     * the video pipeline runs as a separate step on top of the Fashn-generated try-on images.
+     */
+    @Bean
+    public FalKlingVideoClient falKlingVideoClient(
+            @Value("${fal.api.key:}") String falApiKey,
+            @Value("${fal.model-id:fal-ai/kling-video/v3/pro/image-to-video}") String falModelId,
+            @Value("${fal.queue-base-url:https://queue.fal.run}") String falQueueBaseUrl,
+            @Value("${fal.timeout-seconds:600}") long falTimeoutSeconds,
+            @Value("${fal.poll-interval-ms:5000}") long falPollIntervalMs) {
+
+        return new FalKlingVideoClient(
+                falApiKey, falModelId, falQueueBaseUrl, falTimeoutSeconds, falPollIntervalMs);
     }
 }

@@ -16,7 +16,15 @@ spring:
         "[auto_quote_keyword]": true
         "[format_sql]": true
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    schemas:
+      - bioracer
+    create-schemas: true
 
 springdoc:
   server-url: ${API_URL}
