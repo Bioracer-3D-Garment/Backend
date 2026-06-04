@@ -56,6 +56,9 @@ public class AssetGenerationController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitBatch(
             @RequestParam("frontDesign") MultipartFile frontDesign,
+            // backDesign is still accepted (the UI uploads it), but the current Fashn tryon-max
+            // model only consumes the single front/product image, so it is not forwarded.
+            // Kept on the contract for forward-compatibility with a back-aware model.
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
             @RequestParam("folderId") Long folderId,
@@ -63,7 +66,7 @@ public class AssetGenerationController {
         ) {
         AssetGenerationJob job;
         try {
-            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId, advancedSettings);
+            job = assetGenerationService.submitAssetGeneration(frontDesign, modelId, folderId, advancedSettings);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);

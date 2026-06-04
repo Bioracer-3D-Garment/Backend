@@ -27,7 +27,6 @@ public class FashnAdapter implements VTONAdapter {
     @Override
     @SuppressWarnings("unchecked")
     public byte[] generate(byte[] frontDesignBytes,
-                           byte[] backDesignBytes,
                            byte[] personImageBytes,
                            String category,
                            AdvancedSettings advancedSettings) {

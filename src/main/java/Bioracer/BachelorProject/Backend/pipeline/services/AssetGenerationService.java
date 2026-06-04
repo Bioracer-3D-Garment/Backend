@@ -72,7 +72,6 @@ public class AssetGenerationService {
     }
 
     public AssetGenerationJob submitAssetGeneration(MultipartFile frontDesign,
-                                                    MultipartFile backDesign,
                                                     Long modelId,
                                                     Long folderId,
                                                     AdvancedSettings advancedSettings) throws IOException {
@@ -83,10 +82,9 @@ public class AssetGenerationService {
 
         String productId = resolveProductId(frontDesign.getOriginalFilename());
         byte[] frontDesignBytes = frontDesign.getBytes();
-        byte[] backDesignBytes = backDesign.getBytes();
 
         AssetGenerationJob job = createJob(positions.size(), folderId);
-        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, backDesignBytes, poseImageIds, advancedSettings);
+        runAssetGeneration(job.getJobId(), productId, frontDesignBytes, poseImageIds, advancedSettings);
         return job;
     }
 
@@ -110,7 +108,6 @@ public class AssetGenerationService {
     public void runAssetGeneration(String jobId,
                                    String productId,
                                    byte[] frontDesignBytes,
-                                   byte[] backDesignBytes,
                                    Map<String, String> poseImageIds,
                                    AdvancedSettings advancedSettings) {
         AssetGenerationJob job = jobRepository.findById(jobId)
@@ -120,7 +117,7 @@ public class AssetGenerationService {
             job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
-            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes, poseImageIds, advancedSettings);
+            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, poseImageIds, advancedSettings);
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
@@ -143,7 +140,6 @@ public class AssetGenerationService {
     private List<FailedItem> processAllCombinations(AssetGenerationJob job,
                                                      String productId,
                                                      byte[] frontDesignBytes,
-                                                     byte[] backDesignBytes,
                                                      Map<String, String> poseImageIds,
                                                      AdvancedSettings advancedSettings) {
         List<FailedItem> failedItems = new CopyOnWriteArrayList<>();
@@ -154,7 +150,7 @@ public class AssetGenerationService {
             for (String pose : positions) {
                 String posePublicId = poseImageIds.get(pose);
                 futures.add(executor.submit(() -> {
-                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose, posePublicId, job, advancedSettings);
+                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, pose, posePublicId, job, advancedSettings);
                     failure.ifPresent(reason ->
                             failedItems.add(new FailedItem(productId, pose, reason)));
                     recordCompleted(job);
@@ -176,7 +172,6 @@ public class AssetGenerationService {
     /** Returns empty on success, or the failure reason string. */
     private Optional<String> processOneWithRetry(String productId,
                                                   byte[] frontDesignBytes,
-                                                  byte[] backDesignBytes,
                                                   String pose,
                                                   String posePublicId,
                                                   AssetGenerationJob job,
@@ -198,7 +193,7 @@ public class AssetGenerationService {
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                byte[] result = adapter.generate(frontDesignBytes, backDesignBytes, poseBytes, lastError, advancedSettings);
+                byte[] result = adapter.generate(frontDesignBytes, poseBytes, lastError, advancedSettings);
 
                 CloudinaryService.UploadResult uploadResult =
                         cloudinaryService.upload(result, cloudinaryPublicId);
