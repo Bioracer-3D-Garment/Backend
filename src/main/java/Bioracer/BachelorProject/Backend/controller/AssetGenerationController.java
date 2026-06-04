@@ -90,7 +90,8 @@ public class AssetGenerationController {
                 job.getTotalCount(),
                 job.getUploadedCount(),
                 job.getFailedItems(),
-                assets));
+                assets,
+                job.getErrorMessage()));
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")

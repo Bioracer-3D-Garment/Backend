@@ -41,7 +41,7 @@ public class FalKlingVideoClient {
     private static final int DEFAULT_DURATION = 5;
 
     private final RestClient client;
-    private final String modelId;
+    private final String submitUrl;
     private final long timeoutSeconds;
     private final long pollIntervalMs;
 
@@ -54,7 +54,10 @@ public class FalKlingVideoClient {
                 .baseUrl(queueBaseUrl)
                 .defaultHeader("Authorization", "Key " + apiKey)
                 .build();
-        this.modelId = modelId;
+        // Build the absolute submit URL up front. The model id contains slashes
+        // (e.g. "fal-ai/kling-video/v3/pro/image-to-video"); passing it as a RestClient
+        // path variable would percent-encode those slashes to %2F and produce a 404.
+        this.submitUrl = queueBaseUrl.replaceAll("/+$", "") + "/" + modelId;
         this.timeoutSeconds = timeoutSeconds;
         this.pollIntervalMs = pollIntervalMs;
     }
@@ -110,9 +113,10 @@ public class FalKlingVideoClient {
             input.put("elements", List.of(element));
         }
 
-        // Step 1: submit to the queue.
+        // Step 1: submit to the queue. Use an absolute URI so the slashes in the model id
+        // are kept as path separators (a path variable would encode them to %2F → 404).
         Map<String, Object> submit = (Map<String, Object>) client.post()
-                .uri("/{modelId}", modelId)
+                .uri(URI.create(submitUrl))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(input)
                 .retrieve()
