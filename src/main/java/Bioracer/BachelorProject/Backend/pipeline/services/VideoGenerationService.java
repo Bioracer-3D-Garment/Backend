@@ -1,7 +1,7 @@
 package Bioracer.BachelorProject.Backend.pipeline.services;
 
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
-import Bioracer.BachelorProject.Backend.pipeline.adapters.FalKlingVideoClient;
+import Bioracer.BachelorProject.Backend.pipeline.adapters.KlingAdapter;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
@@ -35,13 +35,13 @@ public class VideoGenerationService {
     private static final String VIDEO_POSE = "video";
     private static final String VIDEO_CATEGORY = "video";
 
-    private final FalKlingVideoClient videoClient;
+    private final KlingAdapter videoClient;
     private final AssetGenerationJobRepository jobRepository;
     private final GeneratedAssetRepository generatedAssetRepository;
     private final CloudinaryService cloudinaryService;
     private final ProjectRepository projectRepository;
 
-    public VideoGenerationService(FalKlingVideoClient videoClient,
+    public VideoGenerationService(KlingAdapter videoClient,
                                   AssetGenerationJobRepository jobRepository,
                                   GeneratedAssetRepository generatedAssetRepository,
                                   CloudinaryService cloudinaryService,

@@ -47,4 +47,3 @@ fal:
   model-id: fal-ai/kling-video/v3/pro/image-to-video
   queue-base-url: https://queue.fal.run
   timeout-seconds: 600
-  poll-interval-ms: 5000

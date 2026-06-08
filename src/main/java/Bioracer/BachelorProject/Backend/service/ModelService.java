@@ -32,21 +32,14 @@ public class ModelService {
         if (modelInput.name().isBlank()) {
             throw new ModelException("Name is required.");
         }
-        if (modelInput.front().isBlank()) {
-            throw new ModelException("Front image is required.");
-        }
-        if (modelInput.back().isBlank()) {
-            throw new ModelException("Back image is required.");
-        }
-        if (modelInput.side().isBlank()) {
-            throw new ModelException("Side image is required.");
-        }
         if (modelInput.gender().toString().isBlank()) {
             throw new ModelException("Gender is required.");
         }
         if (modelRepository.existsByName(modelInput.name())) {
             throw new ModelException("Model with name: " + modelInput.name() + " already exists.");
         }
+        // Photos are not required at creation time; they are uploaded in the second
+        // step of the add-model flow and saved via updateModelDetails.
         return modelRepository.save(new Model(modelInput.name(), modelInput.coverImage(), modelInput.front(),
                 modelInput.back(), modelInput.side(), modelInput.gender()));
     }

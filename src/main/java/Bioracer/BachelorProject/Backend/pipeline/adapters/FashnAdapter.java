@@ -56,6 +56,10 @@ public class FashnAdapter implements VTONAdapter {
                 .retrieve()
                 .body(Map.class);
 
+        if (submitResponse == null || submitResponse.get("id") == null) {
+            throw new RuntimeException("Fashn.ai /run returned no prediction id"
+                    + (submitResponse != null ? ": " + submitResponse.get("error") : ""));
+        }
         String predictionId = (String) submitResponse.get("id");
 
         // Step 2: poll until completed, failed, or timed out
@@ -84,8 +88,9 @@ public class FashnAdapter implements VTONAdapter {
                         .body(byte[].class);
             }
 
-            if ("failed".equals(status) || "cancelled".equals(status)) {
-                throw new RuntimeException("Fashn.ai prediction " + status + " for id: " + predictionId);
+            if ("failed".equals(status)) {
+                throw new RuntimeException("Fashn.ai prediction failed for id " + predictionId
+                        + ": " + statusResponse.get("error"));
             }
         }
 

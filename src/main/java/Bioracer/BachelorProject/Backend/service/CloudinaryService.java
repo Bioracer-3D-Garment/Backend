@@ -61,17 +61,22 @@ public class CloudinaryService {
     }
 
     /**
-     * Resolves a Cloudinary public ID to its secure delivery URL and downloads the image bytes.
-     * Used by the generation pipeline to fetch a model's pose images.
+     * Looks up a Cloudinary resource by public ID via the Admin API, then downloads
+     * the image bytes from the returned secure_url.
+     * Using the API (instead of constructing a URL) guarantees we get the real
+     * delivery URL regardless of format or subfolder.
      */
+    @SuppressWarnings("unchecked")
     public byte[] download(String publicId) {
         if (publicId == null || publicId.isBlank()) {
             throw new IllegalArgumentException("Cannot download Cloudinary image: publicId is blank");
         }
         try {
-            String url = cloudinary.url().secure(true).generate(publicId);
+            Map<String, Object> resource = (Map<String, Object>) cloudinary.api()
+                    .resource(publicId, ObjectUtils.emptyMap());
+            String secureUrl = (String) resource.get("secure_url");
             byte[] bytes = RestClient.create().get()
-                    .uri(url)
+                    .uri(secureUrl)
                     .retrieve()
                     .body(byte[].class);
             if (bytes == null || bytes.length == 0) {
@@ -79,7 +84,8 @@ public class CloudinaryService {
             }
             return bytes;
         } catch (Exception e) {
-            throw new RuntimeException("Cloudinary download failed for publicId=" + publicId, e);
+            throw new RuntimeException("Cloudinary download failed for publicId=" + publicId
+                    + ": " + e.getMessage(), e);
         }
     }
 

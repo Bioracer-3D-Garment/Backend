@@ -24,7 +24,9 @@ public class UploadController {
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping("/model/poses")
     public ResponseEntity<CloudinaryService.UploadResult> upload(
-            @RequestParam MultipartFile file, @RequestParam String modelId, @RequestParam String pose)
+            @RequestParam MultipartFile file,
+            @RequestParam String modelId,
+            @RequestParam String pose)
             throws IOException {
 
         String publicId = "model_" + modelId + "_" + pose;
