@@ -14,4 +14,6 @@ public record AssetGenerationStatusResponse(
         int uploadedCount,
         List<FailedItem> failedItems,
         @Schema(nullable = true)
-        List<GeneratedAssetResponse> assets) {}
+        List<GeneratedAssetResponse> assets,
+        @Schema(nullable = true, description = "Failure reason when status is FAILED (e.g. video pipeline error); null otherwise.")
+        String errorMessage) {}

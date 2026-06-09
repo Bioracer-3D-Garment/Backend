@@ -3,24 +3,16 @@ package Bioracer.BachelorProject.Backend.pipeline.adapters;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
+import Bioracer.BachelorProject.Backend.pipeline.models.AdvancedSettings;
+
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class FashnAdapter implements VTONAdapter {
-
-    private static final String DEFAULT_PROMPT =
-            "Fit the garment onto the model exactly as shown in the product image. " +
-            "Preserve all text, logos, graphics, colors, patterns, and fabric details on the garment " +
-            "with pixel-accurate fidelity — do not alter, distort, remove, or reinterpret any design elements. " +
-            "The garment contains the text 'Bioracer' — reproduce it exactly as printed. " +
-            "Do not modify the model's face, skin tone, hair, pose, or body in any way. " +
-            "The garment should appear naturally worn with realistic draping, fit, and lighting " +
-            "consistent with the model image.";
-
+    
     private static final long POLL_INTERVAL_MS = 3_000;
-
     private final RestClient client;
     private final long timeoutSeconds;
 
@@ -35,24 +27,22 @@ public class FashnAdapter implements VTONAdapter {
     @Override
     @SuppressWarnings("unchecked")
     public byte[] generate(byte[] frontDesignBytes,
-                           byte[] backDesignBytes,
                            byte[] personImageBytes,
                            String category,
-                           String prompt) {
+                           AdvancedSettings advancedSettings) {
         String modelImage   = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
         String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(frontDesignBytes);
-        String effectivePrompt = (prompt != null) ? prompt : DEFAULT_PROMPT;
 
         // tryon-max only accepts a single garment image (the front/product image).
         // back_garment_image is NOT supported by this model and must not be sent.
         Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("model_image",      modelImage);
         inputs.put("product_image",    productImage);
-        inputs.put("prompt",           effectivePrompt);
-        inputs.put("resolution",       "1k");
+        inputs.put("prompt",           advancedSettings.getPrompt());
+        inputs.put("resolution",       advancedSettings.getResolution());
         inputs.put("generation_mode",  "balanced");
         inputs.put("num_images",       1);
-        inputs.put("output_format",    "png");
+        inputs.put("output_format",    advancedSettings.getOutputFormat());
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model_name", "tryon-max");
@@ -66,6 +56,10 @@ public class FashnAdapter implements VTONAdapter {
                 .retrieve()
                 .body(Map.class);
 
+        if (submitResponse == null || submitResponse.get("id") == null) {
+            throw new RuntimeException("Fashn.ai /run returned no prediction id"
+                    + (submitResponse != null ? ": " + submitResponse.get("error") : ""));
+        }
         String predictionId = (String) submitResponse.get("id");
 
         // Step 2: poll until completed, failed, or timed out
@@ -94,8 +88,9 @@ public class FashnAdapter implements VTONAdapter {
                         .body(byte[].class);
             }
 
-            if ("failed".equals(status) || "cancelled".equals(status)) {
-                throw new RuntimeException("Fashn.ai prediction " + status + " for id: " + predictionId);
+            if ("failed".equals(status)) {
+                throw new RuntimeException("Fashn.ai prediction failed for id " + predictionId
+                        + ": " + statusResponse.get("error"));
             }
         }
 

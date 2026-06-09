@@ -20,11 +20,20 @@ public class PipelineConfig {
             @Value("${fashn.timeout-seconds:120}") long fashnTimeoutSeconds,
             @Value("${kling.api.key:}") String klingApiKey) {
 
-        return switch (adapterName) {
-            case "fashn" -> new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
-            case "kling" -> new KlingAdapter(klingApiKey);
-            default -> throw new IllegalArgumentException("Unknown vton.adapter value: '" + adapterName +
-                    "'. Supported values: fashn, kling");
-        };
+        return new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
+    }
+
+    /**
+     * Client for fal.ai's Kling v3 Pro image-to-video model. Independent of {@code vton.adapter}:
+     * the video pipeline runs as a separate step on top of the Fashn-generated try-on images.
+     */
+    @Bean
+    public KlingAdapter klingAdapter(
+            @Value("${fal.api.key:}") String falApiKey,
+            @Value("${fal.model-id:fal-ai/kling-video/v3/pro/image-to-video}") String falModelId,
+            @Value("${fal.queue-base-url:https://queue.fal.run}") String falQueueBaseUrl,
+            @Value("${fal.timeout-seconds:600}") long falTimeoutSeconds) {
+
+        return new KlingAdapter(falApiKey, falModelId, falQueueBaseUrl, falTimeoutSeconds);
     }
 }

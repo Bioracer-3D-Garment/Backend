@@ -32,15 +32,6 @@ public class ModelService {
         if (modelInput.name().isBlank()) {
             throw new ModelException("Name is required.");
         }
-        if (modelInput.front().isBlank()) {
-            throw new ModelException("Front image is required.");
-        }
-        if (modelInput.back().isBlank()) {
-            throw new ModelException("Back image is required.");
-        }
-        if (modelInput.side().isBlank()) {
-            throw new ModelException("Side image is required.");
-        }
         if (modelInput.gender().toString().isBlank()) {
             throw new ModelException("Gender is required.");
         }

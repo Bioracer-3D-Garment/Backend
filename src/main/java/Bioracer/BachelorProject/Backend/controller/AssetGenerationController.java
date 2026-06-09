@@ -4,6 +4,7 @@ import Bioracer.BachelorProject.Backend.controller.DTO.AssetGenerationStatusResp
 import Bioracer.BachelorProject.Backend.controller.DTO.ErrorResponse;
 import Bioracer.BachelorProject.Backend.controller.DTO.GeneratedAssetResponse;
 import Bioracer.BachelorProject.Backend.model.GeneratedAsset;
+import Bioracer.BachelorProject.Backend.pipeline.models.AdvancedSettings;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationJob;
 import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
@@ -35,10 +36,11 @@ public class AssetGenerationController {
 
     public AssetGenerationController(AssetGenerationService assetGenerationService,
                                      AssetGenerationJobRepository jobRepository,
-                                     GeneratedAssetRepository generatedAssetRepository) {
+                                     GeneratedAssetRepository generatedAssetRepository, Bioracer.BachelorProject.Backend.controller.AssetController assetController, Bioracer.BachelorProject.Backend.service.AssetService assetService) {
         this.assetGenerationService = assetGenerationService;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
+
     }
 
     /**
@@ -52,22 +54,25 @@ public class AssetGenerationController {
      */
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> submitBatch(
+    public ResponseEntity<?> submitBatch(
             @RequestParam("frontDesign") MultipartFile frontDesign,
+            // backDesign is still accepted (the UI uploads it), but the current Fashn tryon-max
+            // model only consumes the single front/product image, so it is not forwarded.
+            // Kept on the contract for forward-compatibility with a back-aware model.
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
-            @RequestParam("folderId") Long folderId) {
+            @RequestParam("folderId") Long folderId,
+            @RequestPart("advancedSettings") AdvancedSettings advancedSettings
+        ) {
         AssetGenerationJob job;
         try {
-            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId);
+            job = assetGenerationService.submitAssetGeneration(frontDesign, modelId, folderId, advancedSettings);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);
-        } catch (Exception e) {
-            throw e;
         }
 
-        return ResponseEntity.accepted().body("Job has been accepted: " + job.getJobId());
+        return ResponseEntity.accepted().body(java.util.Map.of("jobId", job.getJobId()));
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
@@ -90,7 +95,8 @@ public class AssetGenerationController {
                 job.getTotalCount(),
                 job.getUploadedCount(),
                 job.getFailedItems(),
-                assets));
+                assets,
+                job.getErrorMessage()));
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")

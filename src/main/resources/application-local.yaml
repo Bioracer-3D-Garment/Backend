@@ -10,6 +10,7 @@ spring:
   jpa:
     show-sql: true
     open-in-view: true
+
     properties:
       hibernate:
         "[default_schema]": bioracer
@@ -40,3 +41,9 @@ fashn:
   api.key: ${FASHN_API_KEY:}
   base-url: https://api.fashn.ai/v1
   timeout-seconds: 120
+
+fal:
+  api.key: ${FAL_API_KEY:}
+  model-id: fal-ai/kling-video/v3/pro/image-to-video
+  queue-base-url: https://queue.fal.run
+  timeout-seconds: 600
