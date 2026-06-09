@@ -47,7 +47,9 @@ public class ProjectService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException("User does not exist."));
         return projectRepository
-                .save(new Project(projectInput.name(), user, projectInput.coverImage(), projectInput.images()));
+                .save(new Project(projectInput.name(), user,
+                        sanitizeFilename(projectInput.coverImage()),
+                        sanitizeFilenames(projectInput.images())));
     }
 
     public Project updateProjectDetails(long id, ProjectInput projectInput, Long userId) {
@@ -60,13 +62,42 @@ public class ProjectService {
             existingProject.setName(projectInput.name());
         }
         if (!Objects.equals(projectInput.coverImage(), existingProject.getCoverImage())) {
-            existingProject.setCoverImage(projectInput.coverImage());
+            existingProject.setCoverImage(sanitizeFilename(projectInput.coverImage()));
         }
         if (!Objects.equals(projectInput.images(), existingProject.getImages())) {
-            existingProject.setImages(projectInput.images());
+            existingProject.setImages(sanitizeFilenames(projectInput.images()));
         }
 
         return projectRepository.save(existingProject);
+    }
+
+    private String sanitizeFilename(String input) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+        if (trimmed.contains("://")) {
+            try {
+                java.net.URI uri = new java.net.URI(trimmed);
+                trimmed = uri.getPath();
+            } catch (Exception e) {
+                // ignore and fall back to string extraction
+            }
+        }
+        int slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+        return slashIndex >= 0 ? trimmed.substring(slashIndex + 1) : trimmed;
+    }
+
+    private List<String> sanitizeFilenames(List<String> values) {
+        if (values == null) {
+            return null;
+        }
+        return values.stream()
+                .map(this::sanitizeFilename)
+                .toList();
     }
 
     public void deleteProject(Long id, Long userId) {

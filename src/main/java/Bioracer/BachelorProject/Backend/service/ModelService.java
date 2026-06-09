@@ -38,10 +38,12 @@ public class ModelService {
         if (modelRepository.existsByName(modelInput.name())) {
             throw new ModelException("Model with name: " + modelInput.name() + " already exists.");
         }
-        // Photos are not required at creation time; they are uploaded in the second
-        // step of the add-model flow and saved via updateModelDetails.
-        return modelRepository.save(new Model(modelInput.name(), modelInput.coverImage(), modelInput.front(),
-                modelInput.back(), modelInput.side(), modelInput.gender()));
+        return modelRepository.save(new Model(modelInput.name(),
+                sanitizeFilename(modelInput.coverImage()),
+                sanitizeFilename(modelInput.front()),
+                sanitizeFilename(modelInput.back()),
+                sanitizeFilename(modelInput.side()),
+                modelInput.gender()));
     }
 
     public Model updateModelDetails(ModelInput modelInput, long id) {
@@ -63,14 +65,34 @@ public class ModelService {
             throw new ModelException("Gender is required.");
         }
         if (!modelInput.coverImage().isBlank()) {
-            model.setCoverImage(modelInput.coverImage());
+            model.setCoverImage(sanitizeFilename(modelInput.coverImage()));
         }
         model.setName(modelInput.name());
-        model.setFront(modelInput.front());
-        model.setBack(modelInput.back());
-        model.setSide(modelInput.side());
+        model.setFront(sanitizeFilename(modelInput.front()));
+        model.setBack(sanitizeFilename(modelInput.back()));
+        model.setSide(sanitizeFilename(modelInput.side()));
         model.setGender(modelInput.gender());
         return modelRepository.save(model);
+    }
+
+    private String sanitizeFilename(String input) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+        if (trimmed.contains("://")) {
+            try {
+                java.net.URI uri = new java.net.URI(trimmed);
+                trimmed = uri.getPath();
+            } catch (Exception e) {
+                // ignore and fall back to string extraction
+            }
+        }
+        int slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+        return slashIndex >= 0 ? trimmed.substring(slashIndex + 1) : trimmed;
     }
 
     public String deleteModel(long id) {

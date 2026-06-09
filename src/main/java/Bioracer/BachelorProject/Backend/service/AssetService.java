@@ -19,11 +19,11 @@ public class AssetService {
 
     private final GeneratedAssetRepository assetRepository;
     private final ProjectRepository projectRepository;
-    private final CloudinaryService cloudinaryService;
+    private final UploadService cloudinaryService;
 
     public AssetService(GeneratedAssetRepository assetRepository,
             ProjectRepository projectRepository,
-            CloudinaryService cloudinaryService) {
+            UploadService cloudinaryService) {
         this.assetRepository = assetRepository;
         this.projectRepository = projectRepository;
         this.cloudinaryService = cloudinaryService;
