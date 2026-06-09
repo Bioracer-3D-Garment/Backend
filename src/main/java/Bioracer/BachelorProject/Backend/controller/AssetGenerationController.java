@@ -35,8 +35,10 @@ public class AssetGenerationController {
     private final GeneratedAssetRepository generatedAssetRepository;
 
     public AssetGenerationController(AssetGenerationService assetGenerationService,
-                                     AssetGenerationJobRepository jobRepository,
-                                     GeneratedAssetRepository generatedAssetRepository, Bioracer.BachelorProject.Backend.controller.AssetController assetController, Bioracer.BachelorProject.Backend.service.AssetService assetService) {
+            AssetGenerationJobRepository jobRepository,
+            GeneratedAssetRepository generatedAssetRepository,
+            Bioracer.BachelorProject.Backend.controller.AssetController assetController,
+            Bioracer.BachelorProject.Backend.service.AssetService assetService) {
         this.assetGenerationService = assetGenerationService;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
@@ -47,26 +49,27 @@ public class AssetGenerationController {
      * POST /batches
      *
      * Accepts multipart/form-data with separate garment views:
-     *   frontDesign — front view of the clothing item
-     *   backDesign  — back view of the clothing item
-     *   modelId     — model ID (required)
-     *   folderId    — project ID (required)
+     * frontDesign — front view of the clothing item
+     * backDesign — back view of the clothing item
+     * modelId — model ID (required)
+     * folderId — project ID (required)
      */
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitBatch(
             @RequestParam("frontDesign") MultipartFile frontDesign,
-            // backDesign is still accepted (the UI uploads it), but the current Fashn tryon-max
+            // backDesign is still accepted (the UI uploads it), but the current Fashn
+            // tryon-max
             // model only consumes the single front/product image, so it is not forwarded.
             // Kept on the contract for forward-compatibility with a back-aware model.
             @RequestParam("backDesign") MultipartFile backDesign,
             @RequestParam("modelId") Long modelId,
             @RequestParam("folderId") Long folderId,
-            @RequestPart("advancedSettings") AdvancedSettings advancedSettings
-        ) {
+            @RequestPart("advancedSettings") AdvancedSettings advancedSettings) {
         AssetGenerationJob job;
         try {
-            job = assetGenerationService.submitAssetGeneration(frontDesign, modelId, folderId, advancedSettings);
+            job = assetGenerationService.submitAssetGeneration(frontDesign, backDesign, modelId, folderId,
+                    advancedSettings);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to process the uploaded garment images", e);
@@ -136,7 +139,7 @@ public class AssetGenerationController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header("Content-Disposition", "attachment; filename=\"" + jobId + ".zip\"")
-            .body(zipArchiveBuffer.toByteArray());
+                .body(zipArchiveBuffer.toByteArray());
     }
 
     private AssetGenerationJob requireJob(String jobId) {

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 public class FashnAdapter implements VTONAdapter {
-    
+
     private static final long POLL_INTERVAL_MS = 3_000;
     private final RestClient client;
     private final long timeoutSeconds;
@@ -27,22 +27,23 @@ public class FashnAdapter implements VTONAdapter {
     @Override
     @SuppressWarnings("unchecked")
     public byte[] generate(byte[] frontDesignBytes,
-                           byte[] personImageBytes,
-                           String category,
-                           AdvancedSettings advancedSettings) {
-        String modelImage   = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
+            byte[] backDesignBytes,
+            byte[] personImageBytes,
+            String category,
+            AdvancedSettings advancedSettings) {
+        String modelImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
         String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(frontDesignBytes);
 
         // tryon-max only accepts a single garment image (the front/product image).
         // back_garment_image is NOT supported by this model and must not be sent.
         Map<String, Object> inputs = new LinkedHashMap<>();
-        inputs.put("model_image",      modelImage);
-        inputs.put("product_image",    productImage);
-        inputs.put("prompt",           advancedSettings.getPrompt());
-        inputs.put("resolution",       advancedSettings.getResolution());
-        inputs.put("generation_mode",  "balanced");
-        inputs.put("num_images",       1);
-        inputs.put("output_format",    advancedSettings.getOutputFormat());
+        inputs.put("model_image", modelImage);
+        inputs.put("product_image", productImage);
+        inputs.put("prompt", advancedSettings.getPrompt());
+        inputs.put("resolution", advancedSettings.getResolution());
+        inputs.put("generation_mode", "balanced");
+        inputs.put("num_images", 1);
+        inputs.put("output_format", advancedSettings.getOutputFormat());
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model_name", "tryon-max");

@@ -15,10 +15,10 @@ import java.io.IOException;
 @RequestMapping("/upload")
 public class UploadController {
 
-    private final UploadService cloudinaryService;
+    private final UploadService uploadService;
 
-    public UploadController(UploadService cloudinaryService) {
-        this.cloudinaryService = cloudinaryService;
+    public UploadController(UploadService uploadService) {
+        this.uploadService = uploadService;
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
@@ -31,7 +31,7 @@ public class UploadController {
         if (filename == null || filename.isBlank()) {
             throw new IllegalArgumentException("Uploaded file must have a filename");
         }
-        UploadService.UploadResult result = cloudinaryService.upload(file.getBytes(), filename);
+        UploadService.UploadResult result = uploadService.upload(file.getBytes(), filename);
         return ResponseEntity.ok(result);
     }
 }
