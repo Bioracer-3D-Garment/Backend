@@ -11,7 +11,7 @@ import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRe
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 import Bioracer.BachelorProject.Backend.repository.ModelRepository;
 import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
-import Bioracer.BachelorProject.Backend.service.CloudinaryService;
+import Bioracer.BachelorProject.Backend.service.UploadService;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -42,14 +42,18 @@ public class AssetGenerationService {
     private static final List<String> positions = List.of("front", "back", "side");
     private final VTONAdapter adapter;
     private final AssetGenerationJobRepository jobRepository;
-    private final CloudinaryService cloudinaryService;
+    private final UploadService cloudinaryService;
     private final GeneratedAssetRepository generatedAssetRepository;
     private final ProjectRepository projectRepository;
     private final ModelRepository modelRepository;
 
     public AssetGenerationService(VTONAdapter adapter,
             AssetGenerationJobRepository jobRepository,
+<<<<<<< Updated upstream
             CloudinaryService cloudinaryService,
+=======
+            UploadService cloudinaryService,
+>>>>>>> Stashed changes
             GeneratedAssetRepository generatedAssetRepository,
             ProjectRepository projectRepository,
             ModelRepository modelRepository) {
@@ -72,9 +76,15 @@ public class AssetGenerationService {
     }
 
     public AssetGenerationJob submitAssetGeneration(MultipartFile frontDesign,
+<<<<<<< Updated upstream
             Long modelId,
             Long folderId,
             AdvancedSettings advancedSettings) throws IOException {
+=======
+            MultipartFile backDesign,
+            Long modelId,
+            Long folderId) throws IOException {
+>>>>>>> Stashed changes
 
         // Resolve the model's pose images (Cloudinary public IDs) up front so a bad
         // model
@@ -90,8 +100,13 @@ public class AssetGenerationService {
     }
 
     /**
+<<<<<<< Updated upstream
      * Returns the Cloudinary public ID of each pose image (front/back/side) for the
      * given model.
+=======
+     * Returns the backend filename or file URL of each pose image (front/back/side)
+     * for the given model.
+>>>>>>> Stashed changes
      * Throws 404 if the model does not exist.
      */
     private Map<String, String> resolvePoseImageIds(Long modelId) {
@@ -110,8 +125,13 @@ public class AssetGenerationService {
     public void runAssetGeneration(String jobId,
             String productId,
             byte[] frontDesignBytes,
+<<<<<<< Updated upstream
             Map<String, String> poseImageIds,
             AdvancedSettings advancedSettings) {
+=======
+            byte[] backDesignBytes,
+            Map<String, String> poseImageIds) {
+>>>>>>> Stashed changes
         AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -119,8 +139,13 @@ public class AssetGenerationService {
             job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
+<<<<<<< Updated upstream
             List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, poseImageIds,
                     advancedSettings);
+=======
+            List<FailedItem> failedItems = processAllCombinations(job, productId, frontDesignBytes, backDesignBytes,
+                    poseImageIds);
+>>>>>>> Stashed changes
 
             job.setFailedItems(new ArrayList<>(failedItems));
             if (failedItems.isEmpty()) {
@@ -143,8 +168,13 @@ public class AssetGenerationService {
     private List<FailedItem> processAllCombinations(AssetGenerationJob job,
             String productId,
             byte[] frontDesignBytes,
+<<<<<<< Updated upstream
             Map<String, String> poseImageIds,
             AdvancedSettings advancedSettings) {
+=======
+            byte[] backDesignBytes,
+            Map<String, String> poseImageIds) {
+>>>>>>> Stashed changes
         List<FailedItem> failedItems = new CopyOnWriteArrayList<>();
         List<Future<?>> futures = new ArrayList<>();
 
@@ -153,8 +183,13 @@ public class AssetGenerationService {
             for (String pose : positions) {
                 String posePublicId = poseImageIds.get(pose);
                 futures.add(executor.submit(() -> {
+<<<<<<< Updated upstream
                     Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, pose, posePublicId, job,
                             advancedSettings);
+=======
+                    Optional<String> failure = processOneWithRetry(productId, frontDesignBytes, backDesignBytes, pose,
+                            posePublicId, job);
+>>>>>>> Stashed changes
                     failure.ifPresent(reason -> failedItems.add(new FailedItem(productId, pose, reason)));
                     recordCompleted(job);
                 }));
@@ -175,10 +210,17 @@ public class AssetGenerationService {
     /** Returns empty on success, or the failure reason string. */
     private Optional<String> processOneWithRetry(String productId,
             byte[] frontDesignBytes,
+<<<<<<< Updated upstream
             String pose,
             String posePublicId,
             AssetGenerationJob job,
             AdvancedSettings advancedSettings) {
+=======
+            byte[] backDesignBytes,
+            String pose,
+            String posePublicId,
+            AssetGenerationJob job) {
+>>>>>>> Stashed changes
         if (posePublicId == null || posePublicId.isBlank()) {
             return Optional.of("Model has no '" + pose + "' pose image");
         }
@@ -190,14 +232,22 @@ public class AssetGenerationService {
             return Optional.of("Failed to download pose '" + pose + "' (" + posePublicId + "): " + e.getMessage());
         }
 
+<<<<<<< Updated upstream
         String cloudinaryPublicId = job.getJobId() + "_" + job.getFolderId() + "_" + productId + "_" + pose;
+=======
+        String generatedFilename = productId + "_" + pose + ".jpg";
+>>>>>>> Stashed changes
         String lastError = null;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 byte[] result = adapter.generate(frontDesignBytes, poseBytes, lastError, advancedSettings);
 
+<<<<<<< Updated upstream
                 CloudinaryService.UploadResult uploadResult = cloudinaryService.upload(result, cloudinaryPublicId);
+=======
+                UploadService.UploadResult uploadResult = cloudinaryService.upload(result, generatedFilename);
+>>>>>>> Stashed changes
 
                 GeneratedAsset asset = new GeneratedAsset(
                         projectRepository.getReferenceById(job.getFolderId()),
