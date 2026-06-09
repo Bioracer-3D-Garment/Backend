@@ -27,6 +27,14 @@ public class KlingAdapter {
 
     private static final String DEFAULT_NEGATIVE_PROMPT = "blur, distort, low quality, warping, flicker";
 
+    // fal.ai requires a non-empty prompt (unless multi_prompt is used). When the caller doesn't
+    // supply one we fall back to this turntable description instead of sending a null prompt,
+    // which fal rejects as a missing required field.
+    private static final String DEFAULT_TURNTABLE_PROMPT =
+            "The model stands on a rotating turntable and slowly turns a full 360 degrees, smoothly "
+            + "revealing the front, side and back of the outfit. Studio lighting, clean seamless "
+            + "background, steady locked-off camera, professional product showcase, photorealistic.";
+
     private static final int MIN_DURATION = 3;
     private static final int MAX_DURATION = 15;
     private static final int DEFAULT_DURATION = 5;
@@ -71,7 +79,7 @@ public class KlingAdapter {
         if (endImage != null && !endImage.isBlank()) {
             input.put("end_image_url", endImage);
         }
-        input.put("prompt", prompt);
+        input.put("prompt", (prompt != null && !prompt.isBlank()) ? prompt : DEFAULT_TURNTABLE_PROMPT);
         input.put("negative_prompt", DEFAULT_NEGATIVE_PROMPT);
         input.put("duration", String.valueOf(clampDuration(durationSeconds)));
         // No spoken audio for product turntables — the model defaults this to true otherwise.
@@ -87,9 +95,11 @@ public class KlingAdapter {
             input.put("elements", List.of(element));
         }
 
-        // Step 1: submit prediction
+        // Step 1: submit prediction. Build the path literally so the slashes in the model id
+        // (e.g. "fal-ai/kling-video/v3/pro/image-to-video") stay as path separators — passing it
+        // as a URI template variable percent-encodes them to %2F and 404s on fal's queue.
         Map<String, Object> submitResponse = (Map<String, Object>) client.post()
-                .uri("/{modelId}", modelId)
+                .uri(uriBuilder -> uriBuilder.path("/" + modelId).build())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(input)
                 .retrieve()
