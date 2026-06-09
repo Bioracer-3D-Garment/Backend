@@ -6,9 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record ProjectInput(
-        @NotBlank(message = "Project name is required.") String name,
+                @NotBlank(message = "Project name is required.") String name,
 
-        @Pattern(regexp = "^https://res\\.cloudinary\\.com/.+", message = "Cover image must be a valid Cloudinary secure URL.") String coverImage,
+                @Pattern(regexp = "^https?://.+", message = "Cover image must be a valid URL.") String coverImage,
 
-        List<@Pattern(regexp = "^https://res\\.cloudinary\\.com/.+", message = "Each gallery image must be a valid Cloudinary secure URL.") String> images) {
+                List<@Pattern(regexp = "^https?://.+", message = "Each gallery image must be a valid URL.") String> images) {
 }

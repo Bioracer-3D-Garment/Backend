@@ -1,6 +1,6 @@
 package Bioracer.BachelorProject.Backend.controller;
 
-import Bioracer.BachelorProject.Backend.service.CloudinaryService;
+import Bioracer.BachelorProject.Backend.service.UploadService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,25 +12,26 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 @RestController
-@RequestMapping("/cloudinary")
+@RequestMapping("/upload")
 public class UploadController {
 
-    private final CloudinaryService cloudinaryService;
+    private final UploadService cloudinaryService;
 
-    public UploadController(CloudinaryService cloudinaryService) {
+    public UploadController(UploadService cloudinaryService) {
         this.cloudinaryService = cloudinaryService;
     }
 
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping("/model/poses")
-    public ResponseEntity<CloudinaryService.UploadResult> upload(
-            @RequestParam MultipartFile file,
-            @RequestParam String modelId,
-            @RequestParam String pose)
+    public ResponseEntity<UploadService.UploadResult> upload(
+            @RequestParam MultipartFile file, @RequestParam String modelId, @RequestParam String pose)
             throws IOException {
 
-        String publicId = "model_" + modelId + "_" + pose;
-        CloudinaryService.UploadResult result = cloudinaryService.upload(file.getBytes(), publicId);
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isBlank()) {
+            throw new IllegalArgumentException("Uploaded file must have a filename");
+        }
+        UploadService.UploadResult result = cloudinaryService.upload(file.getBytes(), filename);
         return ResponseEntity.ok(result);
     }
 }
