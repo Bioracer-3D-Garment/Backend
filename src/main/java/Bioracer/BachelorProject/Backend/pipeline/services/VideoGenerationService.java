@@ -7,7 +7,8 @@ import Bioracer.BachelorProject.Backend.pipeline.models.AssetGenerationStatus;
 import Bioracer.BachelorProject.Backend.pipeline.repository.AssetGenerationJobRepository;
 import Bioracer.BachelorProject.Backend.repository.GeneratedAssetRepository;
 import Bioracer.BachelorProject.Backend.repository.ProjectRepository;
-import Bioracer.BachelorProject.Backend.service.CloudinaryService;
+import Bioracer.BachelorProject.Backend.service.UploadService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -21,13 +22,20 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Generates a "turntable" video for a product on top of the already-generated Fashn try-on images.
+ * Generates a "turntable" video for a product on top of the already-generated
+ * Fashn try-on images.
  *
- * <p>The front image is the video's start frame, the back image is the end frame, and the side
- * image (when present) is passed as an extra reference for detail. Runs asynchronously and tracks
- * progress through the shared {@link AssetGenerationJob} machinery, so the frontend can poll the
- * existing {@code /batches/{jobId}/status} endpoint. The finished video is stored as a
- * {@link GeneratedAsset} with {@code poseId="video"} and {@code category="video"}.
+ * <p>
+ * The front image is the video's start frame, the back image is the end frame,
+ * and the side
+ * image (when present) is passed as an extra reference for detail. Runs
+ * asynchronously and tracks
+ * progress through the shared {@link AssetGenerationJob} machinery, so the
+ * frontend can poll the
+ * existing {@code /batches/{jobId}/status} endpoint. The finished video is
+ * stored as a
+ * {@link GeneratedAsset} with {@code poseId="video"} and
+ * {@code category="video"}.
  */
 @Service
 public class VideoGenerationService {
@@ -38,37 +46,41 @@ public class VideoGenerationService {
     private final KlingAdapter videoClient;
     private final AssetGenerationJobRepository jobRepository;
     private final GeneratedAssetRepository generatedAssetRepository;
-    private final CloudinaryService cloudinaryService;
     private final ProjectRepository projectRepository;
+    private final UploadService uploadService;
 
     public VideoGenerationService(KlingAdapter videoClient,
-                                  AssetGenerationJobRepository jobRepository,
-                                  GeneratedAssetRepository generatedAssetRepository,
-                                  CloudinaryService cloudinaryService,
-                                  ProjectRepository projectRepository) {
+            AssetGenerationJobRepository jobRepository,
+            GeneratedAssetRepository generatedAssetRepository,
+            ProjectRepository projectRepository, UploadService uploadService) {
         this.videoClient = videoClient;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
-        this.cloudinaryService = cloudinaryService;
         this.projectRepository = projectRepository;
+        this.uploadService = uploadService;
     }
 
     /**
-     * Validates inputs, resolves the source try-on images, creates a tracking job, and kicks off
-     * async generation. Fails fast (before the job is created) if the project or the required
+     * Validates inputs, resolves the source try-on images, creates a tracking job,
+     * and kicks off
+     * async generation. Fails fast (before the job is created) if the project or
+     * the required
      * front/back images are missing.
      *
-     * @param imageJobId      the image-generation job that produced the try-on assets
+     * @param imageJobId      the image-generation job that produced the try-on
+     *                        assets
      * @param productId       which product within that job to animate
      * @param folderId        the project/folder the video belongs to
-     * @param durationSeconds desired video length (3–15); null uses the model default
-     * @param prompt          optional creative prompt; null uses the default turntable prompt
+     * @param durationSeconds desired video length (3–15); null uses the model
+     *                        default
+     * @param prompt          optional creative prompt; null uses the default
+     *                        turntable prompt
      */
     public AssetGenerationJob submitVideoGeneration(String imageJobId,
-                                                    String productId,
-                                                    Long folderId,
-                                                    Integer durationSeconds,
-                                                    String prompt) {
+            String productId,
+            Long folderId,
+            Integer durationSeconds,
+            String prompt) {
         if (!projectRepository.existsById(folderId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project not found: " + folderId);
         }
@@ -103,13 +115,13 @@ public class VideoGenerationService {
 
     @Async
     public void runVideoGeneration(String jobId,
-                                   String productId,
-                                   Long folderId,
-                                   String frontUrl,
-                                   String backUrl,
-                                   List<String> referenceUrls,
-                                   Integer durationSeconds,
-                                   String prompt) {
+            String productId,
+            Long folderId,
+            String frontUrl,
+            String backUrl,
+            List<String> referenceUrls,
+            Integer durationSeconds,
+            String prompt) {
         AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -119,8 +131,8 @@ public class VideoGenerationService {
 
             byte[] video = videoClient.generate(frontUrl, backUrl, referenceUrls, durationSeconds, prompt);
 
-            String publicId = "bioracer/" + folderId + "/" + productId + "/video";
-            CloudinaryService.UploadResult uploadResult = cloudinaryService.uploadVideo(video, publicId);
+            String publicId = job.getJobId() + "_" + job.getFolderId() + "_" + productId + "_" + video;
+            UploadService.UploadResult uploadResult = uploadService.uploadVideo(video, publicId);
 
             GeneratedAsset asset = new GeneratedAsset(
                     projectRepository.getReferenceById(folderId),
@@ -146,7 +158,10 @@ public class VideoGenerationService {
         }
     }
 
-    /** Maps poseId (front/back/side) to the Cloudinary delivery URL of its try-on image. */
+    /**
+     * Maps poseId (front/back/side) to the Cloudinary delivery URL of its try-on
+     * image.
+     */
     private Map<String, String> resolvePoseUrls(String imageJobId, String productId) {
         return generatedAssetRepository.findByJobId(imageJobId).stream()
                 .filter(a -> productId.equals(a.getProductId()))
