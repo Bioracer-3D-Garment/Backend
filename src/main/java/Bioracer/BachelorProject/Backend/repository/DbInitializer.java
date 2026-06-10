@@ -48,13 +48,27 @@ public class DbInitializer {
 
                 userRepository.save(admin);
 
-                Project project = new Project("Test Project", admin,
-                                "Stella_Artois_logo.svg.png");
+                Project project = new Project("Demo Project", admin,
+                                "bioracer-logo.png");
                 projectRepository.save(project);
 
-                GeneratedAsset asset1 = new GeneratedAsset(project, "http://localhost:8080/model_1_front.png",
-                                "http://localhost:8080/model_1_front.png", "model_1_front.png");
+                GeneratedAsset asset1 = new GeneratedAsset(project,
+                                "https://python-file-server-91ix.onrender.com/files/model_1_front.png",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_front.png",
+                                "model_1_front.png");
+
+                GeneratedAsset asset2 = new GeneratedAsset(project,
+                                "https://python-file-server-91ix.onrender.com/files/model_1_back.png",
+                                "https://python-file-server-91ix.onrender.com/files/model_2_back.png",
+                                "model_2_back.png");
+
+                GeneratedAsset asset3 = new GeneratedAsset(project,
+                                "https://python-file-server-91ix.onrender.com/files/model_1_side.png",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_side.png",
+                                "model_1_side.png");
                 assetRepository.save(asset1);
+                assetRepository.save(asset2);
+                assetRepository.save(asset3);
 
                 Model gaelle = new Model("Gaelle", "model_1_coverImage.png", "model_1_front.png", "model_1_back.png",
                                 "model_1_side.png",
