@@ -29,6 +29,12 @@ cors:
 jwt:
   secret-key: ${JWT_SECRET_KEY}
 
+# Local default: the Flask upload server (server.py) runs on port 8081.
+# Prod keeps the strict ${PUBLIC_URL_BASE} from application.yaml.
+upload:
+  server:
+    url: ${PUBLIC_URL_BASE:http://localhost:8081}
+
 vton:
   adapter: fashn
 

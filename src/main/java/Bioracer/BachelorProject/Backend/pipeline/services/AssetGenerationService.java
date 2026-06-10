@@ -75,6 +75,13 @@ public class AssetGenerationService {
             Long folderId,
             AdvancedSettings advancedSettings) throws IOException {
 
+        if (frontDesign.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "frontDesign file is empty");
+        }
+        if (backDesign.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "backDesign file is empty");
+        }
+
         Map<String, String> poseImageIds = resolvePoseImageIds(modelId);
 
         String productId = resolveProductId(frontDesign.getOriginalFilename());
@@ -228,15 +235,17 @@ public class AssetGenerationService {
 
         String filename = filenameBase + extension;
 
+        // tryon-max takes a single garment image, so send the design that matches
+        // the pose: the back design for the back pose, the front design otherwise.
+        byte[] designBytes = "back".equals(pose) ? backDesignBytes : frontDesignBytes;
+
         String lastError = null;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 byte[] result = adapter.generate(
-                        frontDesignBytes,
-                        backDesignBytes,
+                        designBytes,
                         poseBytes,
-                        lastError,
                         advancedSettings);
 
                 UploadService.UploadResult uploadResult = uploadService.upload(result, filename);

@@ -137,7 +137,9 @@ public class UploadService {
         }
 
         try {
-            String url = uploadServerUrl + "/files/" + fileReference;
+            // server.py serves uploads at GET /<filename> (its /files route is the
+            // JSON listing); a /files/ prefix fails its secure_filename check with 400.
+            String url = uploadServerUrl + "/" + fileReference;
 
             return webClient.get()
                     .uri(URI.create(url))
@@ -156,7 +158,7 @@ public class UploadService {
         }
 
         try {
-            String url = uploadServerUrl + "/files/" + fileReference;
+            String url = uploadServerUrl + "/" + fileReference;
 
             webClient.delete()
                     .uri(URI.create(url))
