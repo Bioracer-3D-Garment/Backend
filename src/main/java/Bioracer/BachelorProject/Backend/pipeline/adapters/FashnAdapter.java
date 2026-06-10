@@ -26,16 +26,14 @@ public class FashnAdapter implements VTONAdapter {
 
     @Override
     @SuppressWarnings("unchecked")
-    public byte[] generate(byte[] frontDesignBytes,
-            byte[] backDesignBytes,
+    public byte[] generate(byte[] designBytes,
             byte[] personImageBytes,
-            String category,
             AdvancedSettings advancedSettings) {
         String modelImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(personImageBytes);
-        String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(frontDesignBytes);
+        String productImage = "data:image/png;base64," + Base64.getEncoder().encodeToString(designBytes);
 
-        // tryon-max only accepts a single garment image (the front/product image).
-        // back_garment_image is NOT supported by this model and must not be sent.
+        // tryon-max only accepts a single garment image per request, so the caller
+        // passes the design matching the pose (front design or back design).
         Map<String, Object> inputs = new LinkedHashMap<>();
         inputs.put("model_image", modelImage);
         inputs.put("product_image", productImage);
