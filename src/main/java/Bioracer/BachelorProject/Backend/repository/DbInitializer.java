@@ -10,9 +10,7 @@ import Bioracer.BachelorProject.Backend.model.Role;
 import Bioracer.BachelorProject.Backend.model.User;
 import jakarta.annotation.PostConstruct;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Component
@@ -40,6 +38,7 @@ public class DbInitializer {
         }
 
         @PostConstruct
+        @Profile("local")
         public void initialize() {
                 ClearAll();
 
