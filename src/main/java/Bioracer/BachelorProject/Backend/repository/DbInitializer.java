@@ -58,7 +58,7 @@ public class DbInitializer {
 
                 GeneratedAsset asset2 = new GeneratedAsset(project,
                                 "https://python-file-server-91ix.onrender.com/files/model_1_back.png",
-                                "https://python-file-server-91ix.onrender.com/files/model_2_back.png",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_back.png",
                                 "model_1_back.png");
 
                 GeneratedAsset asset3 = new GeneratedAsset(project,

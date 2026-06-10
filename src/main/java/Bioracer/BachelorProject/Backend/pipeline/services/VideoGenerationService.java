@@ -136,7 +136,7 @@ public class VideoGenerationService {
                     VIDEO_POSE,
                     VIDEO_CATEGORY,
                     uploadResult.secureUrl(),
-                    uploadResult.thumbnailUrl(),
+                    frontUrl,
                     uploadResult.publicId());
 
             generatedAssetRepository.save(asset);
