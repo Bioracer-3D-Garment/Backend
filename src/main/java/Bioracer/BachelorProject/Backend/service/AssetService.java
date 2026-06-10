@@ -19,14 +19,14 @@ public class AssetService {
 
     private final GeneratedAssetRepository assetRepository;
     private final ProjectRepository projectRepository;
-    private final UploadService cloudinaryService;
+    private final UploadService uploadService;
 
     public AssetService(GeneratedAssetRepository assetRepository,
             ProjectRepository projectRepository,
-            UploadService cloudinaryService) {
+            UploadService uploadService) {
         this.assetRepository = assetRepository;
         this.projectRepository = projectRepository;
-        this.cloudinaryService = cloudinaryService;
+        this.uploadService = uploadService;
     }
 
     public record ProjectAssetsPage(Long projectId, long totalCount, int page, int size,
@@ -71,7 +71,7 @@ public class AssetService {
         if (!asset.getProject().getUser().getId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
-        cloudinaryService.delete(asset.getPublicId());
+        uploadService.delete(asset.getPublicId());
         assetRepository.delete(asset);
     }
 

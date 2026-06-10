@@ -156,7 +156,7 @@ public class UploadService {
         }
 
         try {
-            String url = uploadServerUrl + "/" + fileReference;
+            String url = uploadServerUrl + "/files/" + fileReference;
 
             webClient.delete()
                     .uri(URI.create(url))
