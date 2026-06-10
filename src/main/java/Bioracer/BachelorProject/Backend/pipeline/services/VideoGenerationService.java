@@ -16,27 +16,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * Generates a "turntable" video for a product on top of the already-generated
- * Fashn try-on images.
- *
- * <p>
- * The front image is the video's start frame, the back image is the end frame,
- * and the side
- * image (when present) is passed as an extra reference for detail. Runs
- * asynchronously and tracks
- * progress through the shared {@link AssetGenerationJob} machinery, so the
- * frontend can poll the
- * existing {@code /batches/{jobId}/status} endpoint. The finished video is
- * stored as a
- * {@link GeneratedAsset} with {@code poseId="video"} and
- * {@code category="video"}.
- */
 @Service
 public class VideoGenerationService {
 
@@ -49,10 +31,13 @@ public class VideoGenerationService {
     private final ProjectRepository projectRepository;
     private final UploadService uploadService;
 
-    public VideoGenerationService(KlingAdapter videoClient,
+    public VideoGenerationService(
+            KlingAdapter videoClient,
             AssetGenerationJobRepository jobRepository,
             GeneratedAssetRepository generatedAssetRepository,
-            ProjectRepository projectRepository, UploadService uploadService) {
+            ProjectRepository projectRepository,
+            UploadService uploadService) {
+
         this.videoClient = videoClient;
         this.jobRepository = jobRepository;
         this.generatedAssetRepository = generatedAssetRepository;
@@ -60,61 +45,61 @@ public class VideoGenerationService {
         this.uploadService = uploadService;
     }
 
-    /**
-     * Validates inputs, resolves the source try-on images, creates a tracking job,
-     * and kicks off
-     * async generation. Fails fast (before the job is created) if the project or
-     * the required
-     * front/back images are missing.
-     *
-     * @param imageJobId      the image-generation job that produced the try-on
-     *                        assets
-     * @param productId       which product within that job to animate
-     * @param folderId        the project/folder the video belongs to
-     * @param durationSeconds desired video length (3–15); null uses the model
-     *                        default
-     * @param prompt          optional creative prompt; null uses the default
-     *                        turntable prompt
-     */
-    public AssetGenerationJob submitVideoGeneration(String imageJobId,
+    public AssetGenerationJob submitVideoGeneration(
+            String imageJobId,
             String productId,
             Long folderId,
             Integer durationSeconds,
             String prompt) {
+
         if (!projectRepository.existsById(folderId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Project not found: " + folderId);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Project not found: " + folderId);
         }
 
         Map<String, String> poseUrls = resolvePoseUrls(imageJobId, productId);
-        String frontUrl = poseUrls.get("front");
-        String backUrl = poseUrls.get("back");
+
+        String frontUrl = toPublicUrl(poseUrls.get("front"));
+        String backUrl = toPublicUrl(poseUrls.get("back"));
+
         if (frontUrl == null || backUrl == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Cannot generate video: missing front and/or back try-on image for product '"
-                            + productId + "' in job '" + imageJobId + "'");
+                    "Missing required front/back images for video generation");
         }
 
         List<String> references = new ArrayList<>();
         String sideUrl = poseUrls.get("side");
         if (sideUrl != null) {
-            references.add(sideUrl);
+            references.add(toPublicUrl(sideUrl));
         }
 
         AssetGenerationJob job = createJob(folderId);
-        runVideoGeneration(job.getJobId(), productId, folderId, frontUrl, backUrl, references,
-                durationSeconds, prompt);
+
+        runVideoGeneration(
+                job.getJobId(),
+                productId,
+                folderId,
+                frontUrl,
+                backUrl,
+                references,
+                durationSeconds,
+                prompt);
+
         return job;
     }
 
     private AssetGenerationJob createJob(Long folderId) {
         String jobId = UUID.randomUUID().toString();
-        String runId = "video_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        // One unit of work: the single video.
-        return jobRepository.save(new AssetGenerationJob(jobId, runId, null, 1, folderId));
+        String runId = "video_" + LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+        return jobRepository.save(
+                new AssetGenerationJob(jobId, runId, null, 1, folderId));
     }
 
     @Async
-    public void runVideoGeneration(String jobId,
+    public void runVideoGeneration(
+            String jobId,
             String productId,
             Long folderId,
             String frontUrl,
@@ -122,6 +107,7 @@ public class VideoGenerationService {
             List<String> referenceUrls,
             Integer durationSeconds,
             String prompt) {
+
         AssetGenerationJob job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown jobId: " + jobId));
 
@@ -129,9 +115,18 @@ public class VideoGenerationService {
             job.setStatus(AssetGenerationStatus.RUNNING);
             jobRepository.save(job);
 
-            byte[] video = videoClient.generate(frontUrl, backUrl, referenceUrls, durationSeconds, prompt);
+            byte[] video = videoClient.generate(
+                    frontUrl,
+                    backUrl,
+                    referenceUrls,
+                    durationSeconds,
+                    prompt);
 
-            String publicId = job.getJobId() + "_" + job.getFolderId() + "_" + productId + "_" + video;
+            String publicId = job.getJobId()
+                    + "_" + job.getFolderId()
+                    + "_" + productId
+                    + "_video";
+
             UploadService.UploadResult uploadResult = uploadService.uploadVideo(video, publicId);
 
             GeneratedAsset asset = new GeneratedAsset(
@@ -143,6 +138,7 @@ public class VideoGenerationService {
                     uploadResult.secureUrl(),
                     uploadResult.thumbnailUrl(),
                     uploadResult.publicId());
+
             generatedAssetRepository.save(asset);
 
             job.setCompletedCount(1);
@@ -159,16 +155,36 @@ public class VideoGenerationService {
     }
 
     /**
-     * Maps poseId (front/back/side) to the Cloudinary delivery URL of its try-on
-     * image.
+     * Converts local upload URLs into public HTTPS URLs required by the video API.
+     */
+    private String toPublicUrl(String url) {
+        if (url == null)
+            return null;
+
+        if (url.startsWith("http://localhost")) {
+            String publicBase = System.getenv("PUBLIC_URL_BASE");
+
+            if (publicBase == null || publicBase.isBlank()) {
+                throw new IllegalStateException(
+                        "PUBLIC_URL_BASE must be set");
+            }
+
+            return url.replace("http://localhost:8081", publicBase);
+        }
+
+        return url;
+    }
+
+    /**
+     * Maps poseId → stored asset URL
      */
     private Map<String, String> resolvePoseUrls(String imageJobId, String productId) {
         return generatedAssetRepository.findByJobId(imageJobId).stream()
                 .filter(a -> productId.equals(a.getProductId()))
                 .filter(a -> a.getPoseId() != null && a.getSecureUrl() != null)
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         GeneratedAsset::getPoseId,
                         GeneratedAsset::getSecureUrl,
-                        (existing, ignored) -> existing));
+                        (a, b) -> a));
     }
 }

@@ -2,14 +2,22 @@ package Bioracer.BachelorProject.Backend.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Files;
 
 @Service
 public class UploadService {
@@ -17,10 +25,17 @@ public class UploadService {
     private final WebClient webClient;
     private final String uploadServerUrl;
 
-    public UploadService(@Value("${upload.server.url:http://localhost:8081}") String uploadServerUrl) {
+    public UploadService(@Value("${upload.server.url}") String uploadServerUrl) {
         this.uploadServerUrl = uploadServerUrl.replaceAll("/+$", "");
+
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs()
+                        .maxInMemorySize(50 * 1024 * 1024))
+                .build();
+
         this.webClient = WebClient.builder()
                 .baseUrl(this.uploadServerUrl)
+                .exchangeStrategies(strategies)
                 .build();
     }
 
@@ -37,18 +52,18 @@ public class UploadService {
         if (!StringUtils.hasText(filename)) {
             throw new IllegalArgumentException("Filename is required for upload");
         }
-        MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        builder.part("file", new ByteArrayResource(imageBytes) {
+
+        ByteArrayResource resource = new ByteArrayResource(imageBytes) {
             @Override
             public String getFilename() {
                 return filename;
             }
-        });
+        };
 
         UploadResponse response = webClient.post()
                 .uri("/upload")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
+                .body(BodyInserters.fromMultipartData("file", resource))
                 .retrieve()
                 .bodyToMono(UploadResponse.class)
                 .block();
@@ -56,19 +71,14 @@ public class UploadService {
         if (response == null || response.filename() == null || response.url() == null) {
             throw new IllegalStateException("Upload server returned an invalid response");
         }
-        ;
-        return new UploadResult(response.url(), response.filename(), response.url(), response.filename());
+        System.out.println(response.url);
+        return new UploadResult(
+                response.url(),
+                response.filename(),
+                response.url(),
+                response.filename());
     }
 
-    /**
-     * Upload a video file to the upload server.
-     * 
-     * @param videoBytes  raw video bytes
-     * @param filename    desired filename (required)
-     * @param contentType MIME type (e.g. "video/mp4"); if null defaults to
-     *                    "video/mp4"
-     * @return UploadResult with URL and filename
-     */
     public UploadResult uploadVideo(byte[] videoBytes, String filename) {
         if (videoBytes == null || videoBytes.length == 0) {
             throw new IllegalArgumentException("Cannot upload empty file");
@@ -76,19 +86,31 @@ public class UploadService {
         if (!StringUtils.hasText(filename)) {
             throw new IllegalArgumentException("Filename is required for upload");
         }
-        MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        String effectiveContentType = "video/mp4";
-        builder.part("file", new ByteArrayResource(videoBytes) {
+        ByteArrayResource resource = new ByteArrayResource(videoBytes) {
             @Override
             public String getFilename() {
                 return filename;
             }
-        }).filename(filename).contentType(MediaType.parseMediaType(effectiveContentType));
+        };
+
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
+        builder.part("file", resource)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.formData()
+                                .name("file")
+                                .filename(filename + ".mp4") // ensures Flask sees it in request.files
+                                .build()
+                                .toString())
+                .contentType(MediaType.parseMediaType("video/mp4"));
+
+        MultiValueMap<String, HttpEntity<?>> multipartBody = builder.build();
 
         UploadResponse response = webClient.post()
                 .uri("/upload")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
+                .body(BodyInserters.fromMultipartData(multipartBody))
                 .retrieve()
                 .bodyToMono(UploadResponse.class)
                 .block();
@@ -96,21 +118,18 @@ public class UploadService {
         if (response == null || response.filename() == null || response.url() == null) {
             throw new IllegalStateException("Upload server returned an invalid response");
         }
-        return new UploadResult(response.url(), response.filename(), response.url(), response.filename());
+
+        return new UploadResult(
+                response.url(),
+                response.filename(),
+                response.url(),
+                response.filename());
     }
 
-    /**
-     * Download a video by its file reference (URL or server reference). Delegates
-     * to {@link #download(String)}.
-     */
     public byte[] downloadVideo(String fileReference) {
         return download(fileReference);
     }
 
-    /**
-     * Delete a video by its file reference (URL or server reference). Delegates to
-     * {@link #delete(String)}.
-     */
     public void deleteVideo(String fileReference) {
         delete(fileReference);
     }
@@ -119,18 +138,16 @@ public class UploadService {
         if (fileReference == null || fileReference.isBlank()) {
             throw new IllegalArgumentException("Cannot download file: reference is blank");
         }
+
         try {
-            String url = uploadServerUrl + "/" + fileReference;
-            System.out.println("Downloading file from URL: " + url);
-            byte[] bytes = webClient.get()
+            String url = uploadServerUrl + "/files/" + fileReference;
+
+            return webClient.get()
                     .uri(URI.create(url))
                     .retrieve()
                     .bodyToMono(byte[].class)
                     .block();
-            if (bytes == null || bytes.length == 0) {
-                throw new IllegalStateException("File server returned empty body for reference=" + fileReference);
-            }
-            return bytes;
+
         } catch (Exception e) {
             throw new RuntimeException("File download failed for reference=" + fileReference, e);
         }
@@ -140,13 +157,16 @@ public class UploadService {
         if (fileReference == null || fileReference.isBlank()) {
             throw new IllegalArgumentException("Cannot delete file: reference is blank");
         }
+
         try {
-            String url = uploadServerUrl + "/" + fileReference;
+            String url = uploadServerUrl + "/files/" + fileReference;
+
             webClient.delete()
                     .uri(URI.create(url))
                     .retrieve()
                     .bodyToMono(Void.class)
                     .block();
+
         } catch (Exception e) {
             throw new RuntimeException("File delete failed for reference=" + fileReference, e);
         }
