@@ -61,8 +61,6 @@ public class UserService {
         }
 
         final var hashedPassword = passwordEncoder.encode(userInput.password());
-        System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        System.out.println(userInput.role());
         final var user = new User(
                 userInput.firstName(),
                 userInput.lastName(),

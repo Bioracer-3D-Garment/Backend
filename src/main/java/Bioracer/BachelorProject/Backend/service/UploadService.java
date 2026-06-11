@@ -68,7 +68,6 @@ public class UploadService {
         if (response == null || response.filename() == null || response.url() == null) {
             throw new IllegalStateException("Upload server returned an invalid response");
         }
-        System.out.println(response.url);
         return new UploadResult(
                 response.url(),
                 response.filename(),

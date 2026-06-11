@@ -3,6 +3,7 @@ package Bioracer.BachelorProject.Backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import Bioracer.BachelorProject.Backend.controller.DTO.ProjectInput;
+import Bioracer.BachelorProject.Backend.exception.NotFoundException;
 import Bioracer.BachelorProject.Backend.exception.UserException;
 import Bioracer.BachelorProject.Backend.model.Project;
 import Bioracer.BachelorProject.Backend.model.Role;
@@ -47,13 +49,39 @@ class ProjectServiceTest {
     }
 
     @Test
-    void createProjectStoresCoverAndGalleryUrls() {
+    void getAllProjectsReturnsAllProjects() {
+        List<Project> projects = List.of(
+                new Project("Project One", owner),
+                new Project("Project Two", owner));
+        when(projectRepository.findAll()).thenReturn(projects);
+
+        assertThat(projectService.getAllProjects()).containsExactlyElementsOf(projects);
+    }
+
+    @Test
+    void getAllProjectsByUserIdReturnsProjectsOfUser() {
+        List<Project> projects = List.of(new Project("Project One", owner));
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.findAllByUserId(1000L)).thenReturn(projects);
+
+        assertThat(projectService.getAllProjectsByUserId(1000L)).containsExactlyElementsOf(projects);
+    }
+
+    @Test
+    void getAllProjectsByUserIdThrowsWhenUserDoesNotExist() {
+        when(userRepository.findById(9999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.getAllProjectsByUserId(9999L))
+                .isInstanceOf(UserException.class)
+                .hasMessage("User does not exist!");
+    }
+
+    @Test
+    void createProjectStoresCoverAndGalleryImages() {
         ProjectInput input = new ProjectInput(
                 "Race Dashboard",
-                "https://res.cloudinary.com/demo/image/upload/v1/cover.jpg",
-                List.of(
-                        "https://res.cloudinary.com/demo/image/upload/v1/gallery-1.jpg",
-                        "https://res.cloudinary.com/demo/image/upload/v1/gallery-2.jpg"));
+                "cover.jpg",
+                List.of("gallery-1.jpg", "gallery-2.jpg"));
 
         when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
         when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -64,42 +92,44 @@ class ProjectServiceTest {
         verify(projectRepository).save(projectCaptor.capture());
 
         Project savedProject = projectCaptor.getValue();
-        assertThat(savedProject.getCoverImage()).isEqualTo(input.coverImage());
-        assertThat(savedProject.getImages()).containsExactlyElementsOf(input.images());
-        assertThat(created.getImages()).containsExactlyElementsOf(input.images());
+        assertThat(savedProject.getName()).isEqualTo("Race Dashboard");
+        assertThat(savedProject.getUser()).isEqualTo(owner);
+        assertThat(savedProject.getCoverImage()).isEqualTo("cover.jpg");
+        assertThat(savedProject.getImages()).containsExactly("gallery-1.jpg", "gallery-2.jpg");
+        assertThat(created.getImages()).containsExactly("gallery-1.jpg", "gallery-2.jpg");
     }
 
     @Test
-    void updateProjectDetailsUpdatesCoverAndGalleryUrls() {
-        Project existing = new Project(
-                "Old Name",
-                owner,
-                "https://res.cloudinary.com/demo/image/upload/v1/old-cover.jpg",
-                List.of("https://res.cloudinary.com/demo/image/upload/v1/old-gallery.jpg"));
-        ReflectionTestUtils.setField(existing, "id", 12L);
-
+    void createProjectStripsPathsAndUrlsToFilenames() {
         ProjectInput input = new ProjectInput(
-                "New Name",
-                "https://res.cloudinary.com/demo/image/upload/v1/new-cover.jpg",
-                List.of("https://res.cloudinary.com/demo/image/upload/v1/new-gallery.jpg"));
+                "Race Dashboard",
+                "https://example.com/uploads/v1/cover.jpg",
+                List.of("uploads\\gallery-1.jpg", "/var/images/gallery-2.jpg"));
 
-        when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
-        when(projectRepository.save(existing)).thenReturn(existing);
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Project updated = projectService.updateProjectDetails(12L, input, 1000L);
+        Project created = projectService.createProject(input, 1000L);
 
-        assertThat(updated.getName()).isEqualTo("New Name");
-        assertThat(updated.getCoverImage()).isEqualTo(input.coverImage());
-        assertThat(updated.getImages()).containsExactlyElementsOf(input.images());
+        assertThat(created.getCoverImage()).isEqualTo("cover.jpg");
+        assertThat(created.getImages()).containsExactly("gallery-1.jpg", "gallery-2.jpg");
+    }
+
+    @Test
+    void createProjectThrowsWhenUserDoesNotExist() {
+        ProjectInput input = new ProjectInput("Race Dashboard", "cover.jpg", List.of("gallery-1.jpg"));
+
+        when(userRepository.findById(9999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.createProject(input, 9999L))
+                .isInstanceOf(UserException.class)
+                .hasMessage("User does not exist.");
+        verify(projectRepository, never()).save(any(Project.class));
     }
 
     @Test
     void getProjectByIdReturnsProjectForOwner() {
-        Project existing = new Project(
-                "Project",
-                owner,
-                "https://res.cloudinary.com/demo/image/upload/v1/cover.jpg",
-                List.of("https://res.cloudinary.com/demo/image/upload/v1/gallery.jpg"));
+        Project existing = new Project("Project", owner, "cover.jpg", List.of("gallery.jpg"));
         ReflectionTestUtils.setField(existing, "id", 77L);
 
         when(projectRepository.findById(77L)).thenReturn(Optional.of(existing));
@@ -107,7 +137,16 @@ class ProjectServiceTest {
         Project found = projectService.getProjectById(77L, 1000L);
 
         assertThat(found.getId()).isEqualTo(77L);
-        assertThat(found.getImages()).containsExactly("https://res.cloudinary.com/demo/image/upload/v1/gallery.jpg");
+        assertThat(found.getImages()).containsExactly("gallery.jpg");
+    }
+
+    @Test
+    void getProjectByIdThrowsWhenProjectDoesNotExist() {
+        when(projectRepository.findById(77L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.getProjectById(77L, 1000L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Project with ID: 77 not found.");
     }
 
     @Test
@@ -123,19 +162,84 @@ class ProjectServiceTest {
     }
 
     @Test
-    void updateProjectDetailsThrowsWhenRequesterDoesNotOwnProject() {
-        Project existing = new Project("Project", owner);
+    void updateProjectDetailsUpdatesCoverAndGalleryImages() {
+        Project existing = new Project("Old Name", owner, "old-cover.jpg", List.of("old-gallery.jpg"));
         ReflectionTestUtils.setField(existing, "id", 12L);
 
         ProjectInput input = new ProjectInput(
                 "New Name",
-                "https://res.cloudinary.com/demo/image/upload/v1/new-cover.jpg",
-                List.of("https://res.cloudinary.com/demo/image/upload/v1/new-gallery.jpg"));
+                "new-cover.jpg",
+                List.of("new-gallery.jpg"));
+
+        when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
+        when(projectRepository.save(existing)).thenReturn(existing);
+
+        Project updated = projectService.updateProjectDetails(12L, input, 1000L);
+
+        assertThat(updated.getName()).isEqualTo("New Name");
+        assertThat(updated.getCoverImage()).isEqualTo("new-cover.jpg");
+        assertThat(updated.getImages()).containsExactly("new-gallery.jpg");
+    }
+
+    @Test
+    void updateProjectDetailsThrowsWhenProjectDoesNotExist() {
+        ProjectInput input = new ProjectInput("New Name", "new-cover.jpg", List.of("new-gallery.jpg"));
+
+        when(projectRepository.findById(12L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.updateProjectDetails(12L, input, 1000L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Project with ID: 12 not found.");
+        verify(projectRepository, never()).save(any(Project.class));
+    }
+
+    @Test
+    void updateProjectDetailsThrowsWhenRequesterDoesNotOwnProject() {
+        Project existing = new Project("Project", owner);
+        ReflectionTestUtils.setField(existing, "id", 12L);
+
+        ProjectInput input = new ProjectInput("New Name", "new-cover.jpg", List.of("new-gallery.jpg"));
 
         when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> projectService.updateProjectDetails(12L, input, 2000L))
                 .isInstanceOf(UserException.class)
                 .hasMessage("Not authorized!");
+        verify(projectRepository, never()).save(any(Project.class));
+    }
+
+    @Test
+    void deleteProjectDeletesProjectForOwner() {
+        Project existing = new Project("Project", owner);
+        ReflectionTestUtils.setField(existing, "id", 55L);
+
+        when(projectRepository.findById(55L)).thenReturn(Optional.of(existing));
+
+        projectService.deleteProject(55L, 1000L);
+
+        verify(projectRepository).delete(existing);
+    }
+
+    @Test
+    void deleteProjectThrowsWhenProjectDoesNotExist() {
+        when(projectRepository.findById(55L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.deleteProject(55L, 1000L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Project with ID: 55 not found.");
+        verify(projectRepository, never()).delete(any(Project.class));
+    }
+
+    @Test
+    void deleteProjectThrowsWhenRequesterDoesNotOwnProject() {
+        Project existing = new Project("Project", owner);
+        ReflectionTestUtils.setField(existing, "id", 55L);
+
+        when(projectRepository.findById(55L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> projectService.deleteProject(55L, 2000L))
+                .isInstanceOf(UserException.class)
+                .hasMessage("Not authorized!");
+        verify(projectRepository, never()).delete(any(Project.class));
     }
 }

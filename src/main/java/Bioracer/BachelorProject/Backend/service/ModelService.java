@@ -100,20 +100,13 @@ public class ModelService {
     public String deleteModel(long id) {
         Model model = modelRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Model with ID: " + id + " does not exist."));
-        System.out.println(model.getCoverImage());
-        System.out.println(model.getFront());
-        System.out.println(model.getBack());
-        System.out.println(model.getSide());
         try {
-            if (model.getCoverImage().equals(model.getFront()) || model.getCoverImage().equals(model.getBack())
-                    || model.getCoverImage().equals(model.getSide())) {
-                uploadService.delete(model.getFront());
-                uploadService.delete(model.getBack());
-                uploadService.delete(model.getSide());
-            } else {
-                uploadService.delete(model.getFront());
-                uploadService.delete(model.getBack());
-                uploadService.delete(model.getSide());
+            uploadService.delete(model.getFront());
+            uploadService.delete(model.getBack());
+            uploadService.delete(model.getSide());
+            // only delete the cover separately when it is not one of the other images
+            if (!model.getCoverImage().equals(model.getFront()) && !model.getCoverImage().equals(model.getBack())
+                    && !model.getCoverImage().equals(model.getSide())) {
                 uploadService.delete(model.getCoverImage());
             }
             modelRepository.delete(model);
