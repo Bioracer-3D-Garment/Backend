@@ -52,30 +52,37 @@ public class DbInitializer {
                 projectRepository.save(project);
 
                 GeneratedAsset asset1 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_front.png",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_front.png",
-                                "model_1_front.png");
+                                "https://python-file-server-91ix.onrender.com/files/model_1_front.jpg",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_front.jpg",
+                                "model_1_front.jpg");
 
                 GeneratedAsset asset2 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_back.png",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_back.png",
-                                "model_1_back.png");
+                                "https://python-file-server-91ix.onrender.com/files/model_1_back.jpg",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_back.jpg",
+                                "model_1_back.jpg");
 
                 GeneratedAsset asset3 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_side.png",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_side.png",
-                                "model_1_side.png");
+                                "https://python-file-server-91ix.onrender.com/files/model_1_side.jpg",
+                                "https://python-file-server-91ix.onrender.com/files/model_1_side.jpg",
+                                "model_1_side.jpg");
                 assetRepository.save(asset1);
                 assetRepository.save(asset2);
                 assetRepository.save(asset3);
 
-                Model gaelle = new Model("Gaelle", "model_1_coverImage.png", "model_1_front.png", "model_1_back.png",
-                                "model_1_side.png",
+                Model model1 = new Model("Model 1", "model_1_coverImage.jpg", "model_1_front.jpg", "model_1_back.jpg",
+                                "model_1_side.jpg",
                                 Gender.FEMALE);
-                Model patrick = new Model("Patrick", "model_2_coverImage.png", "model_2_front.png", "model_2_back.png",
-                                "model_2_side.png",
+                Model model2 = new Model("Model 2", "model_2_coverImage.jpg", "model_2_front.jpg", "model_2_back.jpg",
+                                "model_2_side.jpg",
                                 Gender.MALE);
-                modelRepository.save(gaelle);
-                modelRepository.save(patrick);
+                Model model3 = new Model("Model 3", "model_3_coverImage.jpg", "model_3_front.jpg", "model_3_back.jpg",
+                                "model_3_side.jpg",
+                                Gender.FEMALE);
+                Model model4 = new Model("Model 4", "model_4_coverImage.jpg", "model_4_front.jpg", "model_4_back.jpg",
+                                "model_4_side.jpg", Gender.MALE);
+                modelRepository.save(model1);
+                modelRepository.save(model2);
+                modelRepository.save(model3);
+                modelRepository.save(model4);
         }
 }
