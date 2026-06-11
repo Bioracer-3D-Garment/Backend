@@ -4,23 +4,19 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
+import java.util.Base64;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 public class KlingAdapter {
 
     private static final long POLL_INTERVAL_MS = 5_000;
+    private static final int DEFAULT_DURATION = 5;
 
     private static final String DEFAULT_NEGATIVE_PROMPT = "blur, distort, low quality, warping, flicker";
-
-    private static final String DEFAULT_TURNTABLE_PROMPT = "The model stands on a rotating turntable and slowly turns a full 360 degrees, smoothly "
+    private static final String DEFAULT_PROMPT = "The model stands and rotates and slowly turns 180 degrees, smoothly "
             + "revealing the front, side and back of the outfit. Studio lighting, clean seamless "
             + "background, steady locked-off camera, professional product showcase, photorealistic.";
-
-    private static final int MIN_DURATION = 3;
-    private static final int MAX_DURATION = 15;
-    private static final int DEFAULT_DURATION = 5;
 
     private final RestClient client;
     private final String modelId;
@@ -36,50 +32,17 @@ public class KlingAdapter {
     }
 
     @SuppressWarnings("unchecked")
-    public byte[] generate(String startImage,
-            String endImage,
-            List<String> referenceImageUrls,
-            Integer durationSeconds,
-            String prompt) {
-
-        if (startImage == null || startImage.isBlank()) {
-            throw new IllegalArgumentException("startImageUrl (front frame) is required");
-        }
-
-        boolean hasReferences = referenceImageUrls != null && !referenceImageUrls.isEmpty();
-
+    public byte[] generate(byte[] startImage, byte[] endImage, int durationSeconds, String prompt) {
         Map<String, Object> input = new LinkedHashMap<>();
-        input.put("start_image_url", startImage);
-        if (endImage != null && !endImage.isBlank()) {
-            input.put("end_image_url", endImage);
-        }
-        input.put("prompt", (prompt != null && !prompt.isBlank()) ? prompt : DEFAULT_TURNTABLE_PROMPT);
+        input.put("start_image_url", toBase64DataUri(startImage));
+        input.put("end_image_url", toBase64DataUri(endImage));
+        input.put("prompt", prompt != null ? prompt : DEFAULT_PROMPT);
         input.put("negative_prompt", DEFAULT_NEGATIVE_PROMPT);
-        input.put("duration", String.valueOf(clampDuration(durationSeconds)));
-        // No spoken audio for product turntables — the model defaults this to true
-        // otherwise.
+        input.put("duration", durationSeconds > 0 ? String.valueOf(durationSeconds) : String.valueOf(DEFAULT_DURATION));
         input.put("generate_audio", false);
 
-        // Extra views (e.g. side) ride along as an image-set element, referenced in the
-        // prompt
-        // as @Element1. Same model + same garment as the start/end frames, so identity
-        // stays
-        // consistent without feeding garment-less reference photos.
-        if (hasReferences) {
-            Map<String, Object> element = new LinkedHashMap<>();
-            element.put("frontal_image_url", referenceImageUrls.get(0));
-            element.put("reference_image_urls", referenceImageUrls);
-            input.put("elements", List.of(element));
-        }
-
-        // Step 1: submit prediction. Build the path literally so the slashes in the
-        // model id
-        // (e.g. "fal-ai/kling-video/v3/pro/image-to-video") stay as path separators —
-        // passing it
-        // as a URI template variable percent-encodes them to %2F and 404s on fal's
-        // queue.
         Map<String, Object> submitResponse = (Map<String, Object>) client.post()
-                .uri(uriBuilder -> uriBuilder.path("/" + modelId).build())
+                .uri("/" + modelId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(input)
                 .retrieve()
@@ -89,8 +52,44 @@ public class KlingAdapter {
         String statusUrl = (String) submitResponse.get("status_url");
         String responseUrl = (String) submitResponse.get("response_url");
 
-        // Step 2: poll until completed, failed, or timed out
+        System.out.println("Submitted request: " + requestId);
+
+        return pollForResult(requestId, statusUrl, responseUrl);
+    }
+
+    private static String toBase64DataUri(byte[] imageBytes) {
+        String mimeType = detectMimeType(imageBytes);
+        return "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes);
+    }
+
+    private static String detectMimeType(byte[] bytes) {
+        if (bytes.length >= 3
+                && bytes[0] == (byte) 0xFF
+                && bytes[1] == (byte) 0xD8
+                && bytes[2] == (byte) 0xFF) {
+            return "image/jpeg";
+        }
+        if (bytes.length >= 8
+                && bytes[0] == (byte) 0x89
+                && bytes[1] == (byte) 0x50 // P
+                && bytes[2] == (byte) 0x4E // N
+                && bytes[3] == (byte) 0x47) { // G
+            return "image/png";
+        }
+        if (bytes.length >= 4
+                && bytes[0] == (byte) 0x52 // R
+                && bytes[1] == (byte) 0x49 // I
+                && bytes[2] == (byte) 0x46 // F
+                && bytes[3] == (byte) 0x46) { // F
+            return "image/webp";
+        }
+        return "image/jpeg"; // fallback
+    }
+
+    @SuppressWarnings("unchecked")
+    private byte[] pollForResult(String requestId, String statusUrl, String responseUrl) {
         long deadline = System.currentTimeMillis() + timeoutSeconds * 1_000L;
+
         while (System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(POLL_INTERVAL_MS);
@@ -105,6 +104,7 @@ public class KlingAdapter {
                     .body(Map.class);
 
             String status = (String) statusResponse.get("status");
+            System.out.println("Request " + requestId + " status: " + status);
 
             if ("COMPLETED".equals(status)) {
                 Map<String, Object> result = (Map<String, Object>) client.get()
@@ -114,6 +114,8 @@ public class KlingAdapter {
 
                 Map<String, Object> video = (Map<String, Object>) result.get("video");
                 String videoUrl = (String) video.get("url");
+
+                System.out.println("Downloading video from: " + videoUrl);
                 return RestClient.create().get()
                         .uri(URI.create(videoUrl))
                         .retrieve()
@@ -127,12 +129,5 @@ public class KlingAdapter {
 
         throw new RuntimeException(
                 "fal.ai video generation timed out after " + timeoutSeconds + "s for request: " + requestId);
-    }
-
-    private static int clampDuration(Integer durationSeconds) {
-        if (durationSeconds == null) {
-            return DEFAULT_DURATION;
-        }
-        return Math.max(MIN_DURATION, Math.min(MAX_DURATION, durationSeconds));
     }
 }

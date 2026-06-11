@@ -137,13 +137,12 @@ public class UploadService {
 
         try {
             String url = uploadServerUrl + "/files/" + fileReference;
-
+            System.out.println(url);
             return webClient.get()
                     .uri(URI.create(url))
                     .retrieve()
                     .bodyToMono(byte[].class)
                     .block();
-
         } catch (Exception e) {
             throw new RuntimeException("File download failed for reference=" + fileReference, e);
         }

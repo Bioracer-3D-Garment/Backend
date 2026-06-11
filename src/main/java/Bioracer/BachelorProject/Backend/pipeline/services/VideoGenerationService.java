@@ -12,8 +12,10 @@ import Bioracer.BachelorProject.Backend.service.UploadService;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -59,18 +61,27 @@ public class VideoGenerationService {
 
         Map<String, String> poseUrls = resolvePoseUrls(imageJobId, productId);
 
-        String frontUrl = toPublicUrl(poseUrls.get("front"));
-        String backUrl = toPublicUrl(poseUrls.get("back"));
+        String frontUrl = poseUrls.get("front");
+        String backUrl = poseUrls.get("back");
 
         if (frontUrl == null || backUrl == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Missing required front/back images for video generation");
         }
 
-        List<String> references = new ArrayList<>();
-        String sideUrl = poseUrls.get("side");
-        if (sideUrl != null) {
-            references.add(toPublicUrl(sideUrl));
+        byte[] frontBytes = fetchImageBytes(frontUrl);
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("FRONT BYTES: " + frontBytes.length);
+        System.out.println(frontBytes);
+        byte[] backBytes = fetchImageBytes(backUrl);
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         AssetGenerationJob job = createJob(folderId);
@@ -80,8 +91,8 @@ public class VideoGenerationService {
                 productId,
                 folderId,
                 frontUrl,
-                backUrl,
-                references,
+                frontBytes,
+                backBytes,
                 durationSeconds,
                 prompt);
 
@@ -103,8 +114,8 @@ public class VideoGenerationService {
             String productId,
             Long folderId,
             String frontUrl,
-            String backUrl,
-            List<String> referenceUrls,
+            byte[] frontBytes,
+            byte[] backBytes,
             Integer durationSeconds,
             String prompt) {
 
@@ -116,9 +127,8 @@ public class VideoGenerationService {
             jobRepository.save(job);
 
             byte[] video = videoClient.generate(
-                    frontUrl,
-                    backUrl,
-                    referenceUrls,
+                    frontBytes,
+                    backBytes,
                     durationSeconds,
                     prompt);
 
@@ -154,22 +164,16 @@ public class VideoGenerationService {
         }
     }
 
-    private String toPublicUrl(String url) {
-        if (url == null)
-            return null;
-
-        if (url.startsWith("http://localhost")) {
-            String publicBase = System.getenv("PUBLIC_URL_BASE");
-
-            if (publicBase == null || publicBase.isBlank()) {
-                throw new IllegalStateException(
-                        "PUBLIC_URL_BASE must be set");
-            }
-
-            return url.replace("http://localhost:8081", publicBase);
+    private byte[] fetchImageBytes(String url) {
+        try {
+            return RestClient.create().get()
+                    .uri(URI.create(url))
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Failed to fetch image bytes from: " + url, e);
         }
-
-        return url;
     }
 
     private Map<String, String> resolvePoseUrls(String imageJobId, String productId) {
