@@ -20,10 +20,13 @@ public class Model {
     @NotBlank(message = "Name is required.")
     private String name;
 
+    @NotBlank(message = "Front is required.")
     private String front;
 
+    @NotBlank(message = "Back is required.")
     private String back;
 
+    @NotBlank(message = "Side is required.")
     private String side;
 
     @NotNull(message = "Gender is required.")
