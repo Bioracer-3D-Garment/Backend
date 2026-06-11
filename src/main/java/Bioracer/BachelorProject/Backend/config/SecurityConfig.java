@@ -5,12 +5,10 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -41,7 +39,6 @@ import java.util.List;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    // ---------------- JWT authorities converter ----------------
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
@@ -53,7 +50,6 @@ public class SecurityConfig {
         return converter;
     }
 
-    // ---------------- Main security filter chain ----------------
     @Bean
     @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
@@ -73,7 +69,6 @@ public class SecurityConfig {
                 .build();
     }
 
-    // ---------------- CORS configuration ----------------
     @Bean
     public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
         var configuration = new CorsConfiguration();
@@ -87,7 +82,6 @@ public class SecurityConfig {
         return source;
     }
 
-    // ---------------- Secret key for JWT ----------------
     @Bean
     public SecretKey secretKey(JwtProperties jwtProperties) {
         if (jwtProperties.secretKey() == null || jwtProperties.secretKey().isEmpty()) {
@@ -97,13 +91,11 @@ public class SecurityConfig {
         return new SecretKeySpec(keyBytes, "HmacSHA256");
     }
 
-    // ---------------- Password encoder ----------------
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
     }
 
-    // ---------------- JWT decoder ----------------
     @Bean
     public JwtDecoder jwtDecoder(SecretKey secretKey) {
         return NimbusJwtDecoder.withSecretKey(secretKey)
@@ -111,7 +103,6 @@ public class SecurityConfig {
                 .build();
     }
 
-    // ---------------- JWT encoder ----------------
     @Bean
     public JwtEncoder jwtEncoder(SecretKey secretKey) {
         JWK jwk = new OctetSequenceKey.Builder(secretKey)
@@ -121,7 +112,6 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(jwks);
     }
 
-    // ---------------- Authentication manager ----------------
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
             throws Exception {

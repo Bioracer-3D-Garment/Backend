@@ -28,21 +28,18 @@ public class ModelController {
         this.modelService = modelService;
     }
 
-    // only users and admin
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping()
     public List<Model> getAll() {
         return modelService.getAllModels();
     }
 
-    // only users and admin
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @GetMapping("/id")
     public Model getById(@RequestParam Long id) {
         return modelService.getModelById(id);
     }
 
-    // only users and admin
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping()
     public Model createModel(@Valid @RequestBody ModelInput modelInput) {

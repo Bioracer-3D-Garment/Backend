@@ -154,9 +154,6 @@ public class VideoGenerationService {
         }
     }
 
-    /**
-     * Converts local upload URLs into public HTTPS URLs required by the video API.
-     */
     private String toPublicUrl(String url) {
         if (url == null)
             return null;
@@ -175,9 +172,6 @@ public class VideoGenerationService {
         return url;
     }
 
-    /**
-     * Maps poseId → stored asset URL
-     */
     private Map<String, String> resolvePoseUrls(String imageJobId, String productId) {
         return generatedAssetRepository.findByJobId(imageJobId).stream()
                 .filter(a -> productId.equals(a.getProductId()))

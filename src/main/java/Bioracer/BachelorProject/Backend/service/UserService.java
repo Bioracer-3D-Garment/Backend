@@ -37,13 +37,6 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    /**
-     * Authenticates with a given username and password
-     *
-     * @param username the user's username
-     * @param password the user's password (in plaintext)
-     * @return an AuthenticationResponse containing a JWT
-     */
     public AuthenticationResponse authenticate(String email, String password) {
         try {
             final var usernamePasswordAuthentication = new UsernamePasswordAuthenticationToken(email, password);
@@ -62,12 +55,6 @@ public class UserService {
         }
     }
 
-    /**
-     * Registers a new user with the given details
-     *
-     * @param userInput the details to use for registration
-     * @return the newly created User
-     */
     public AuthenticationResponse signup(UserInput userInput) {
         if (userRepository.existsByEmail(userInput.email())) {
             throw new UserException("Email is already in use!");
@@ -85,7 +72,6 @@ public class UserService {
 
         userRepository.save(user);
 
-        // Automatically authenticate the new user
         final var usernamePasswordAuthentication = new UsernamePasswordAuthenticationToken(
                 userInput.email(),
                 userInput.password());

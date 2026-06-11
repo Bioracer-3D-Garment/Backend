@@ -14,23 +14,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Parses a CSV catalog file (columns: product_id, garment_type, flat_lay_image_path,
- * garment_description) into a list of CatalogProduct objects.
- *
- * Note: the primary ingestion path is now the multipart asset generation endpoint in AssetGenerationController.
- * This parser is retained for CLI/scripted asset-generation use.
- */
 @Component
 public class CatalogParser {
 
     private static final Logger log = LoggerFactory.getLogger(CatalogParser.class);
 
-    /**
-     * The first row is treated as a header and skipped.
-     * Rows missing product_id or flat_lay_image_path are skipped with a warning.
-     * garment_type is used as the Fashn.ai category (upper_body / lower_body / dresses).
-     */
     public List<CatalogProduct> parse(InputStream is) throws IOException {
         List<CatalogProduct> products = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
@@ -45,9 +33,9 @@ public class CatalogParser {
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
                 line = line.trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
-                // limit=4 so garment_description may contain commas
                 String[] parts = line.split(",", 4);
                 if (parts.length < 3) {
                     log.warn("Skipping malformed CSV row at line {} (expected at least 3 columns): {}",
@@ -55,8 +43,8 @@ public class CatalogParser {
                     continue;
                 }
 
-                String productId        = parts[0].trim();
-                String garmentType      = parts[1].trim();
+                String productId = parts[0].trim();
+                String garmentType = parts[1].trim();
                 String flatLayImagePath = parts[2].trim();
 
                 if (productId.isBlank() || flatLayImagePath.isBlank()) {

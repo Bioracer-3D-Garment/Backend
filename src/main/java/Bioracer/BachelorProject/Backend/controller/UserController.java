@@ -21,20 +21,17 @@ public class UserController {
         this.userService = userService;
     }
 
-    // only admin access
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping
     public List<User> getUsers() {
         return userService.getAllUsers();
     }
 
-    // public
     @PostMapping("/login")
     public AuthenticationResponse login(@RequestBody AuthenticationRequest authenticationRequest) {
         return userService.authenticate(authenticationRequest.email(), authenticationRequest.password());
     }
 
-    // public
     @PostMapping("/signup")
     public AuthenticationResponse signup(@Valid @RequestBody UserInput userInput) {
         return userService.signup(userInput);

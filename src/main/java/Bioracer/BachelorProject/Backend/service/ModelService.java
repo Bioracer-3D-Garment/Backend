@@ -13,9 +13,11 @@ import Bioracer.BachelorProject.Backend.repository.ModelRepository;
 @Service
 public class ModelService {
     private final ModelRepository modelRepository;
+    private final UploadService uploadService;
 
-    public ModelService(ModelRepository modelRepository) {
+    public ModelService(ModelRepository modelRepository, UploadService uploadService) {
         this.modelRepository = modelRepository;
+        this.uploadService = uploadService;
     }
 
     public List<Model> getAllModels() {
@@ -88,7 +90,7 @@ public class ModelService {
                 java.net.URI uri = new java.net.URI(trimmed);
                 trimmed = uri.getPath();
             } catch (Exception e) {
-                // ignore and fall back to string extraction
+
             }
         }
         int slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
@@ -98,8 +100,22 @@ public class ModelService {
     public String deleteModel(long id) {
         Model model = modelRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Model with ID: " + id + " does not exist."));
-
+        System.out.println(model.getCoverImage());
+        System.out.println(model.getFront());
+        System.out.println(model.getBack());
+        System.out.println(model.getSide());
         try {
+            if (model.getCoverImage().equals(model.getFront()) || model.getCoverImage().equals(model.getBack())
+                    || model.getCoverImage().equals(model.getSide())) {
+                uploadService.delete(model.getFront());
+                uploadService.delete(model.getBack());
+                uploadService.delete(model.getSide());
+            } else {
+                uploadService.delete(model.getFront());
+                uploadService.delete(model.getBack());
+                uploadService.delete(model.getSide());
+                uploadService.delete(model.getCoverImage());
+            }
             modelRepository.delete(model);
         } catch (Exception e) {
             throw new ModelException("Delete failed!");

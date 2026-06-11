@@ -23,10 +23,6 @@ public class PipelineConfig {
         return new FashnAdapter(fashnApiKey, fashnBaseUrl, fashnTimeoutSeconds);
     }
 
-    /**
-     * Client for fal.ai's Kling v3 Pro image-to-video model. Independent of {@code vton.adapter}:
-     * the video pipeline runs as a separate step on top of the Fashn-generated try-on images.
-     */
     @Bean
     public KlingAdapter klingAdapter(
             @Value("${fal.api.key:}") String falApiKey,

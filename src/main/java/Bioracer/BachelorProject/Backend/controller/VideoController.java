@@ -13,13 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Turntable video generation (fal.ai Kling v3 Pro image-to-video).
- *
- * <p>Generation runs asynchronously and is tracked via the shared batch-job machinery, so poll
- * progress and retrieve the finished video through the existing {@code GET /batches/{jobId}/status}
- * endpoint — the returned asset has {@code poseId="video"} and its {@code secureUrl} is the MP4.
- */
 @RestController
 @RequestMapping("/videos")
 public class VideoController {
@@ -30,12 +23,6 @@ public class VideoController {
         this.videoGenerationService = videoGenerationService;
     }
 
-    /**
-     * POST /videos
-     *
-     * Animates a product's existing Fashn try-on images (front → start frame, back → end frame,
-     * side → extra reference) into a turntable video. Returns the tracking job id.
-     */
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> submitVideo(@RequestBody VideoGenerationRequest request) {

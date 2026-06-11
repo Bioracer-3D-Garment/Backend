@@ -45,15 +45,6 @@ public class AssetGenerationController {
 
     }
 
-    /**
-     * POST /batches
-     *
-     * Accepts multipart/form-data with separate garment views:
-     * frontDesign — front view of the clothing item
-     * backDesign — back view of the clothing item
-     * modelId — model ID (required)
-     * folderId — project ID (required)
-     */
     @PreAuthorize("hasAuthority('ROLE_USER') or hasAuthority('ROLE_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> submitBatch(

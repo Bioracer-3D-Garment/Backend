@@ -235,8 +235,6 @@ public class AssetGenerationService {
 
         String filename = filenameBase + extension;
 
-        // tryon-max takes a single garment image, so send the design that matches
-        // the pose: the back design for the back pose, the front design otherwise.
         byte[] designBytes = "back".equals(pose) ? backDesignBytes : frontDesignBytes;
 
         String lastError = null;
