@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -204,5 +205,66 @@ class AssetServiceTest {
         assertThatThrownBy(() -> assetService.getProjectAssetsForDownload(5L, 2000L))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void getProjectAssetsReturnsEmptyPageWhenProjectHasNoAssets() {
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(assetRepository.findByProject_Id(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        AssetService.ProjectAssetsPage result = assetService.getProjectAssets(5L, 1000L, null, null, 0, 20);
+
+        assertThat(result.totalCount()).isZero();
+        assertThat(result.assets()).isEmpty();
+    }
+
+    @Test
+    void getProjectAssetsPassesRequestedPageNumber() {
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(assetRepository.findByProject_Id(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        AssetService.ProjectAssetsPage result = assetService.getProjectAssets(5L, 1000L, null, null, 2, 20);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(assetRepository).findByProject_Id(any(Long.class), pageableCaptor.capture());
+
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(result.page()).isEqualTo(2);
+    }
+
+    @Test
+    void getProjectAssetsKeepsRequestedSizeWhenBelowCap() {
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(assetRepository.findByProject_Id(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        AssetService.ProjectAssetsPage result = assetService.getProjectAssets(5L, 1000L, null, null, 0, 50);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(assetRepository).findByProject_Id(any(Long.class), pageableCaptor.capture());
+
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(50);
+        assertThat(result.size()).isEqualTo(50);
+    }
+
+    @Test
+    void deleteAssetPropagatesUploadFailureWithoutDeletingAsset() {
+        when(assetRepository.findById(42L)).thenReturn(Optional.of(asset));
+        doThrow(new RuntimeException("upload server down")).when(uploadService).delete("public-1");
+
+        assertThatThrownBy(() -> assetService.deleteAsset(42L, 1000L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("upload server down");
+        verify(assetRepository, never()).delete(any(GeneratedAsset.class));
+    }
+
+    @Test
+    void getProjectAssetsForDownloadReturnsEmptyListWhenProjectHasNoAssets() {
+        when(projectRepository.findById(5L)).thenReturn(Optional.of(project));
+        when(assetRepository.findAllByProject_Id(5L)).thenReturn(List.of());
+
+        assertThat(assetService.getProjectAssetsForDownload(5L, 1000L)).isEmpty();
     }
 }

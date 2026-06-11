@@ -104,4 +104,59 @@ class GeneratedAssetRepositoryTest {
         assertThat(page.getContent()).extracting(GeneratedAsset::getId)
                 .containsExactly(jobOneFrontAsset.getId());
     }
+
+    @Test
+    void saveAssignsGeneratedIdAndPersistsCreatedAt() {
+        GeneratedAsset saved = assetRepository
+                .saveAndFlush(new GeneratedAsset(project, "secure-5.jpg", "thumb-5.jpg", "public-5"));
+        entityManager.clear();
+
+        GeneratedAsset reloaded = assetRepository.findById(saved.getId()).orElseThrow();
+        assertThat(reloaded.getId()).isNotNull();
+        assertThat(reloaded.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void secondPageContainsRemainingAssets() {
+        Page<GeneratedAsset> page = assetRepository.findByProject_Id(project.getId(), PageRequest.of(1, 2));
+
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+        assertThat(page.getContent()).hasSize(1);
+    }
+
+    @Test
+    void findByProjectIdReturnsEmptyPageForUnknownProject() {
+        Page<GeneratedAsset> page = assetRepository.findByProject_Id(9999L, PageRequest.of(0, 10));
+
+        assertThat(page.getTotalElements()).isZero();
+        assertThat(page.getContent()).isEmpty();
+    }
+
+    @Test
+    void findByProjectIdAndJobIdReturnsEmptyPageForUnknownJob() {
+        Page<GeneratedAsset> page = assetRepository.findByProject_IdAndJobId(project.getId(), "unknown-job",
+                PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).isEmpty();
+    }
+
+    @Test
+    void findByProjectIdAndCategoryReturnsEmptyPageForUnknownCategory() {
+        Page<GeneratedAsset> page = assetRepository.findByProject_IdAndCategory(project.getId(),
+                "unknown-category", PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).isEmpty();
+    }
+
+    @Test
+    void deletingAssetDoesNotDeleteProjectOrOtherAssets() {
+        assetRepository.delete(jobOneFrontAsset);
+        entityManager.flush();
+
+        assertThat(entityManager.find(Project.class, project.getId())).isNotNull();
+        assertThat(assetRepository.findAllByProject_Id(project.getId()))
+                .extracting(GeneratedAsset::getId)
+                .containsExactlyInAnyOrder(jobOneBackAsset.getId(), jobTwoFrontAsset.getId());
+    }
 }

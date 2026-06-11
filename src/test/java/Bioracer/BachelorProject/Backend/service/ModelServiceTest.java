@@ -270,4 +270,86 @@ class ModelServiceTest {
                 .hasMessage("Delete failed!");
         verify(modelRepository, never()).delete(any(Model.class));
     }
+
+    @Test
+    void getAllModelsReturnsEmptyListWhenThereAreNoModels() {
+        when(modelRepository.findAll()).thenReturn(List.of());
+
+        assertThat(modelService.getAllModels()).isEmpty();
+    }
+
+    @Test
+    void createModelThrowsWhenNameIsWhitespace() {
+        ModelInput input = new ModelInput("   ", "cover.jpg", "front.jpg", "back.jpg", "side.jpg", Gender.FEMALE);
+
+        assertThatThrownBy(() -> modelService.createModel(input))
+                .isInstanceOf(ModelException.class)
+                .hasMessage("Name is required.");
+        verify(modelRepository, never()).save(any(Model.class));
+    }
+
+    @Test
+    void updateModelDetailsStripsPathsAndUrlsToFilenames() {
+        ModelInput input = new ModelInput("Updated",
+                "https://example.com/uploads/new-cover.jpg",
+                "uploads/new-front.jpg",
+                "uploads\\new-back.jpg",
+                "/var/images/new-side.jpg",
+                Gender.MALE);
+
+        when(modelRepository.findById(5L)).thenReturn(Optional.of(existingModel));
+        when(modelRepository.save(existingModel)).thenReturn(existingModel);
+
+        Model updated = modelService.updateModelDetails(input, 5L);
+
+        assertThat(updated.getCoverImage()).isEqualTo("new-cover.jpg");
+        assertThat(updated.getFront()).isEqualTo("new-front.jpg");
+        assertThat(updated.getBack()).isEqualTo("new-back.jpg");
+        assertThat(updated.getSide()).isEqualTo("new-side.jpg");
+    }
+
+    @Test
+    void deleteModelSkipsCoverImageWhenItEqualsBack() {
+        Model model = new Model("Gaëlle", "back.jpg", "front.jpg", "back.jpg", "side.jpg", Gender.FEMALE);
+        when(modelRepository.findById(5L)).thenReturn(Optional.of(model));
+
+        modelService.deleteModel(5L);
+
+        verify(uploadService, times(3)).delete(anyString());
+        verify(modelRepository).delete(model);
+    }
+
+    @Test
+    void deleteModelSkipsCoverImageWhenItEqualsSide() {
+        Model model = new Model("Gaëlle", "side.jpg", "front.jpg", "back.jpg", "side.jpg", Gender.FEMALE);
+        when(modelRepository.findById(5L)).thenReturn(Optional.of(model));
+
+        modelService.deleteModel(5L);
+
+        verify(uploadService, times(3)).delete(anyString());
+        verify(modelRepository).delete(model);
+    }
+
+    @Test
+    void createModelKeepsNullCoverImage() {
+        ModelInput input = new ModelInput("Gaëlle", null, "front.jpg", "back.jpg", "side.jpg", Gender.FEMALE);
+
+        when(modelRepository.existsByName("Gaëlle")).thenReturn(false);
+        when(modelRepository.save(any(Model.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Model created = modelService.createModel(input);
+
+        assertThat(created.getCoverImage()).isNull();
+        assertThat(created.getFront()).isEqualTo("front.jpg");
+    }
+
+    @Test
+    void deleteModelThrowsWhenRepositoryDeleteFails() {
+        when(modelRepository.findById(5L)).thenReturn(Optional.of(existingModel));
+        doThrow(new RuntimeException("database down")).when(modelRepository).delete(existingModel);
+
+        assertThatThrownBy(() -> modelService.deleteModel(5L))
+                .isInstanceOf(ModelException.class)
+                .hasMessage("Delete failed!");
+    }
 }

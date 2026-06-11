@@ -1,6 +1,9 @@
 package Bioracer.BachelorProject.Backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import jakarta.validation.ConstraintViolationException;
 
 import java.util.List;
 
@@ -60,5 +63,58 @@ class ProjectRepositoryTest {
         Project reloaded = projectRepository.findById(project.getId()).orElseThrow();
 
         assertThat(reloaded.getImages()).containsExactly("first.jpg", "second.jpg", "third.jpg");
+    }
+
+    @Test
+    void findAllByUserIdReturnsAllProjectsOfThatUser() {
+        entityManager.persist(new Project("First", jane));
+        entityManager.persist(new Project("Second", jane));
+        entityManager.flush();
+
+        assertThat(projectRepository.findAllByUserId(jane.getId()))
+                .extracting(Project::getName)
+                .containsExactlyInAnyOrder("First", "Second");
+    }
+
+    @Test
+    void updatingImagesReplacesGallery() {
+        Project project = entityManager.persist(
+                new Project("Project", jane, "cover.jpg", List.of("old.jpg")));
+        entityManager.flush();
+
+        project.setImages(List.of("new-1.jpg", "new-2.jpg"));
+        projectRepository.saveAndFlush(project);
+        entityManager.clear();
+
+        Project reloaded = projectRepository.findById(project.getId()).orElseThrow();
+        assertThat(reloaded.getImages()).containsExactly("new-1.jpg", "new-2.jpg");
+    }
+
+    @Test
+    void deletingProjectDoesNotDeleteUser() {
+        Project project = entityManager.persist(new Project("Project", jane));
+        entityManager.flush();
+
+        projectRepository.delete(project);
+        entityManager.flush();
+
+        assertThat(projectRepository.findById(project.getId())).isEmpty();
+        assertThat(entityManager.find(User.class, jane.getId())).isNotNull();
+    }
+
+    @Test
+    void persistingProjectWithoutUserFails() {
+        assertThatThrownBy(() -> {
+            entityManager.persist(new Project("Project", null));
+            entityManager.flush();
+        }).isInstanceOf(ConstraintViolationException.class);
+    }
+
+    @Test
+    void persistingProjectWithBlankNameFails() {
+        assertThatThrownBy(() -> {
+            entityManager.persist(new Project("", jane));
+            entityManager.flush();
+        }).isInstanceOf(ConstraintViolationException.class);
     }
 }

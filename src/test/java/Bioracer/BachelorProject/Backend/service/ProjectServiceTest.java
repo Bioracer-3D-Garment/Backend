@@ -242,4 +242,101 @@ class ProjectServiceTest {
                 .hasMessage("Not authorized!");
         verify(projectRepository, never()).delete(any(Project.class));
     }
+
+    @Test
+    void getAllProjectsReturnsEmptyListWhenThereAreNoProjects() {
+        when(projectRepository.findAll()).thenReturn(List.of());
+
+        assertThat(projectService.getAllProjects()).isEmpty();
+    }
+
+    @Test
+    void getAllProjectsByUserIdReturnsEmptyListWhenUserHasNoProjects() {
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.findAllByUserId(1000L)).thenReturn(List.of());
+
+        assertThat(projectService.getAllProjectsByUserId(1000L)).isEmpty();
+    }
+
+    @Test
+    void createProjectKeepsNullCoverAndImages() {
+        ProjectInput input = new ProjectInput("Race Dashboard", null, null);
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        assertThat(created.getCoverImage()).isNull();
+        assertThat(created.getImages()).isNull();
+    }
+
+    @Test
+    void createProjectStoresEmptyImagesList() {
+        ProjectInput input = new ProjectInput("Race Dashboard", "cover.jpg", List.of());
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        assertThat(created.getImages()).isEmpty();
+    }
+
+    @Test
+    void updateProjectDetailsKeepsValuesWhenInputIsUnchanged() {
+        Project existing = new Project("Same Name", owner, "cover.jpg", List.of("gallery.jpg"));
+        ReflectionTestUtils.setField(existing, "id", 12L);
+
+        ProjectInput input = new ProjectInput("Same Name", "cover.jpg", List.of("gallery.jpg"));
+
+        when(projectRepository.findById(12L)).thenReturn(Optional.of(existing));
+        when(projectRepository.save(existing)).thenReturn(existing);
+
+        Project updated = projectService.updateProjectDetails(12L, input, 1000L);
+
+        assertThat(updated.getName()).isEqualTo("Same Name");
+        assertThat(updated.getCoverImage()).isEqualTo("cover.jpg");
+        assertThat(updated.getImages()).containsExactly("gallery.jpg");
+        verify(projectRepository).save(existing);
+    }
+
+    @Test
+    void createProjectTrimsWhitespaceFromFilenames() {
+        ProjectInput input = new ProjectInput("Race Dashboard", "  cover.jpg  ", List.of("  gallery.jpg  "));
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        assertThat(created.getCoverImage()).isEqualTo("cover.jpg");
+        assertThat(created.getImages()).containsExactly("gallery.jpg");
+    }
+
+    @Test
+    void createProjectDropsQueryStringWhenSanitizingUrls() {
+        ProjectInput input = new ProjectInput("Race Dashboard",
+                "https://example.com/files/cover.jpg?version=2&size=large", List.of());
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        assertThat(created.getCoverImage()).isEqualTo("cover.jpg");
+    }
+
+    @Test
+    void createProjectFallsBackToStringExtractionForMalformedUrls() {
+        // "http://[invalid" cannot be parsed as a URI, so the filename is cut after the last slash
+        ProjectInput input = new ProjectInput("Race Dashboard", "http://[invalid/uploads/cover.jpg", List.of());
+
+        when(userRepository.findById(1000L)).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Project created = projectService.createProject(input, 1000L);
+
+        assertThat(created.getCoverImage()).isEqualTo("cover.jpg");
+    }
 }

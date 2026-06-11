@@ -84,4 +84,32 @@ class UploadServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Cannot delete file: reference is blank");
     }
+
+    @Test
+    void uploadVideoThrowsWhenBytesAreNull() {
+        assertThatThrownBy(() -> uploadService.uploadVideo(null, "video"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot upload empty file");
+    }
+
+    @Test
+    void uploadVideoThrowsWhenFilenameIsNull() {
+        assertThatThrownBy(() -> uploadService.uploadVideo(new byte[] { 1 }, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Filename is required for upload");
+    }
+
+    @Test
+    void downloadVideoThrowsWhenReferenceIsBlank() {
+        assertThatThrownBy(() -> uploadService.downloadVideo(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot download file: reference is blank");
+    }
+
+    @Test
+    void deleteVideoThrowsWhenReferenceIsBlank() {
+        assertThatThrownBy(() -> uploadService.deleteVideo(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot delete file: reference is blank");
+    }
 }

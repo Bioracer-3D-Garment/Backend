@@ -132,4 +132,56 @@ class UserServiceTest {
                 .hasMessage("Email is already in use!");
         verify(userRepository, never()).save(any(User.class));
     }
+
+    @Test
+    void getAllUsersReturnsEmptyListWhenThereAreNoUsers() {
+        when(userRepository.findAll()).thenReturn(List.of());
+
+        assertThat(userService.getAllUsers()).isEmpty();
+    }
+
+    @Test
+    void authenticatePassesCredentialsToAuthenticationManager() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(authenticationFor(user));
+        when(jwtService.generateToken(user)).thenReturn("jwt-token");
+
+        userService.authenticate("jane@example.com", "secret");
+
+        ArgumentCaptor<Authentication> authenticationCaptor = ArgumentCaptor.forClass(Authentication.class);
+        verify(authenticationManager).authenticate(authenticationCaptor.capture());
+
+        assertThat(authenticationCaptor.getValue().getName()).isEqualTo("jane@example.com");
+        assertThat(authenticationCaptor.getValue().getCredentials()).isEqualTo("secret");
+    }
+
+    @Test
+    void authenticatePropagatesUnexpectedErrors() {
+        // only BadCredentialsException is translated; other failures must surface as-is
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenThrow(new IllegalStateException("authentication service unavailable"));
+
+        assertThatThrownBy(() -> userService.authenticate("jane@example.com", "secret"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("authentication service unavailable");
+    }
+
+    @Test
+    void signupAuthenticatesWithTheSignupCredentials() {
+        UserInput input = new UserInput("secret", "Jane", "Doe", "jane@example.com", "user");
+
+        when(userRepository.existsByEmail("jane@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("secret")).thenReturn("hashed");
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(authenticationFor(user));
+        when(jwtService.generateToken(user)).thenReturn("jwt-token");
+
+        userService.signup(input);
+
+        ArgumentCaptor<Authentication> authenticationCaptor = ArgumentCaptor.forClass(Authentication.class);
+        verify(authenticationManager).authenticate(authenticationCaptor.capture());
+
+        assertThat(authenticationCaptor.getValue().getName()).isEqualTo("jane@example.com");
+        assertThat(authenticationCaptor.getValue().getCredentials()).isEqualTo("secret");
+    }
 }

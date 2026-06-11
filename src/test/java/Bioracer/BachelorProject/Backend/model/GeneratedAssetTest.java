@@ -2,7 +2,10 @@ package Bioracer.BachelorProject.Backend.model;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -40,6 +43,16 @@ public class GeneratedAssetTest {
         assertEquals("validthumbnailurl", asset.getThumbnailUrl());
         assertEquals("validpublicid", asset.getPublicId());
         assertNotNull(asset.getCreatedAt());
+    }
+
+    @Test
+    public void GivenGeneratedAsset_WhenCreating_ThenCreatedAtIsSetToNow(){
+        LocalDateTime before = LocalDateTime.now();
+        GeneratedAsset asset = new GeneratedAsset(project, "validsecureurl", "validthumbnailurl", "validpublicid");
+        LocalDateTime after = LocalDateTime.now();
+
+        assertFalse(asset.getCreatedAt().isBefore(before));
+        assertFalse(asset.getCreatedAt().isAfter(after));
     }
 
 }

@@ -1,6 +1,9 @@
 package Bioracer.BachelorProject.Backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import jakarta.validation.ConstraintViolationException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,5 +52,43 @@ class ModelRepositoryTest {
     @Test
     void existsByNameReturnsFalseForUnknownName() {
         assertThat(modelRepository.existsByName("Unknown")).isFalse();
+    }
+
+    @Test
+    void saveAssignsGeneratedId() {
+        Model saved = modelRepository.save(
+                new Model("Other", "cover.jpg", "front.jpg", "back.jpg", "side.jpg", Gender.MALE));
+
+        assertThat(saved.getId()).isNotNull();
+    }
+
+    @Test
+    void deleteRemovesModel() {
+        modelRepository.delete(gaelle);
+        entityManager.flush();
+
+        assertThat(modelRepository.findById(gaelle.getId())).isEmpty();
+    }
+
+    @Test
+    void existsByNameIsCaseSensitive() {
+        // documents that the duplicate-name check matches exactly on casing
+        assertThat(modelRepository.existsByName("gaëlle")).isFalse();
+    }
+
+    @Test
+    void persistingModelWithBlankNameFails() {
+        assertThatThrownBy(() -> {
+            entityManager.persist(new Model("", "front.jpg", "back.jpg", "side.jpg", Gender.FEMALE));
+            entityManager.flush();
+        }).isInstanceOf(ConstraintViolationException.class);
+    }
+
+    @Test
+    void persistingModelWithNullGenderFails() {
+        assertThatThrownBy(() -> {
+            entityManager.persist(new Model("Other", "front.jpg", "back.jpg", "side.jpg", null));
+            entityManager.flush();
+        }).isInstanceOf(ConstraintViolationException.class);
     }
 }
