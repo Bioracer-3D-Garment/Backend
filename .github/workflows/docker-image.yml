@@ -40,6 +40,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile.dev
           push: true
           tags: |
             sennebeeckman/bioracer-backend:latest
