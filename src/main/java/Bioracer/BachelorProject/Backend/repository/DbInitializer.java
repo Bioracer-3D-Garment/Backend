@@ -38,7 +38,6 @@ public class DbInitializer {
         }
 
         @PostConstruct
-        @Profile("local")
         public void initialize() {
                 ClearAll();
 
