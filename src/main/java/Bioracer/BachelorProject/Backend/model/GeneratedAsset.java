@@ -53,6 +53,15 @@ public class GeneratedAsset {
         this.createdAt = LocalDateTime.now();
     }
 
+    public GeneratedAsset(Project project, String secureUrl, String thumbnailUrl, String publicId, String poseId) {
+        this.project = project;
+        this.secureUrl = secureUrl;
+        this.thumbnailUrl = thumbnailUrl;
+        this.publicId = publicId;
+        this.poseId = poseId;
+        this.createdAt = LocalDateTime.now();
+    }
+
     public GeneratedAsset(Project project, String jobId, String productId, String poseId,
             String category, String secureUrl, String thumbnailUrl, String publicId) {
         this.project = project;

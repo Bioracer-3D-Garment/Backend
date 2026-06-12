@@ -60,9 +60,12 @@ public class VideoGenerationService {
         }
 
         Map<String, String> poseUrls = resolvePoseUrls(imageJobId, productId);
+        Map<String, String> poseId = resolvePoseId(imageJobId, productId);
 
         String frontUrl = poseUrls.get("front");
         String backUrl = poseUrls.get("back");
+
+        String frontId = poseId.get("front");
 
         if (frontUrl == null || backUrl == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -90,7 +93,7 @@ public class VideoGenerationService {
                 job.getJobId(),
                 productId,
                 folderId,
-                frontUrl,
+                frontId,
                 frontBytes,
                 backBytes,
                 durationSeconds,
@@ -113,7 +116,7 @@ public class VideoGenerationService {
             String jobId,
             String productId,
             Long folderId,
-            String frontUrl,
+            String frontId,
             byte[] frontBytes,
             byte[] backBytes,
             Integer durationSeconds,
@@ -146,7 +149,7 @@ public class VideoGenerationService {
                     VIDEO_POSE,
                     VIDEO_CATEGORY,
                     uploadResult.secureUrl(),
-                    frontUrl,
+                    frontId,
                     uploadResult.publicId());
 
             generatedAssetRepository.save(asset);
@@ -183,6 +186,16 @@ public class VideoGenerationService {
                 .collect(Collectors.toMap(
                         GeneratedAsset::getPoseId,
                         GeneratedAsset::getSecureUrl,
+                        (a, b) -> a));
+    }
+
+    private Map<String, String> resolvePoseId(String imageJobId, String productId) {
+        return generatedAssetRepository.findByJobId(imageJobId).stream()
+                .filter(a -> productId.equals(a.getProductId()))
+                .filter(a -> a.getPoseId() != null && a.getSecureUrl() != null)
+                .collect(Collectors.toMap(
+                        GeneratedAsset::getPoseId,
+                        GeneratedAsset::getPublicId,
                         (a, b) -> a));
     }
 }

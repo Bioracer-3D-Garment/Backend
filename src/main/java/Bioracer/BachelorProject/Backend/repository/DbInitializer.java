@@ -20,6 +20,7 @@ public class DbInitializer {
         private PasswordEncoder passwordEncoder;
         private ModelRepository modelRepository;
         private GeneratedAssetRepository assetRepository;
+        private final String fileServerUrl = System.getenv("PUBLIC_URL_BASE");
 
         public DbInitializer(UserRepository userRepository, ProjectRepository projectRepository,
                         PasswordEncoder passwordEncoder, ModelRepository modelRepository,
@@ -51,22 +52,27 @@ public class DbInitializer {
                 projectRepository.save(project);
 
                 GeneratedAsset asset1 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_front.jpg",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_front.jpg",
+                                fileServerUrl + "/files/model_1_front.jpg",
+                                fileServerUrl + "/files/model_1_front.jpg",
                                 "model_1_front.jpg");
 
                 GeneratedAsset asset2 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_back.jpg",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_back.jpg",
+                                fileServerUrl + "/files/model_1_back.jpg",
+                                fileServerUrl + "/files/model_1_back.jpg",
                                 "model_1_back.jpg");
 
                 GeneratedAsset asset3 = new GeneratedAsset(project,
-                                "https://python-file-server-91ix.onrender.com/files/model_1_side.jpg",
-                                "https://python-file-server-91ix.onrender.com/files/model_1_side.jpg",
+                                fileServerUrl + "/files/model_1_side.jpg",
+                                fileServerUrl + "/files/model_1_side.jpg",
                                 "model_1_side.jpg");
+                GeneratedAsset asset4 = new GeneratedAsset(project,
+                                fileServerUrl + "/files/model_3_video.mp4",
+                                "model_3_front.jpg",
+                                "model_3_video.mp4", "video");
                 assetRepository.save(asset1);
                 assetRepository.save(asset2);
                 assetRepository.save(asset3);
+                assetRepository.save(asset4);
 
                 Model model1 = new Model("Model 1", "model_1_coverImage.jpg", "model_1_front.jpg", "model_1_back.jpg",
                                 "model_1_side.jpg",

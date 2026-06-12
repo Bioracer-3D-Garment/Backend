@@ -17,7 +17,7 @@ spring:
         "[auto_quote_keyword]": true
         "[format_sql]": true
     hibernate:
-      ddl-auto: none
+      ddl-auto: create
 springdoc:
   server-url: ${API_URL}
 
