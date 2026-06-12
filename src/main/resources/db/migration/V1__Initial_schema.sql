@@ -1,6 +1,6 @@
 -- Create schema
 CREATE SCHEMA IF NOT EXISTS bioracer;
-
+SET search_path TO bioracer;
 -- Create user table
 CREATE TABLE "user" (
     id BIGSERIAL PRIMARY KEY,
